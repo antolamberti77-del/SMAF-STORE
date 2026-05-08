@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Apparel Store | Cloud Edition</title>
+    <title>Elite Apparel Store | Admin Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -11,7 +11,7 @@
         
         body {
             font-family: 'Inter', sans-serif;
-            background-color: white;
+            background-color: #f8f9fa;
             color: #001f3f;
             margin: 0;
             overflow-x: hidden;
@@ -22,295 +22,311 @@
 
         .toast {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
-            background: #001f3f;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: #10b981;
             color: white;
-            padding: 16px 30px;
-            border-radius: 20px;
+            padding: 16px 40px;
+            border-radius: 100px;
             font-weight: 900;
             text-transform: uppercase;
-            font-size: 12px;
-            z-index: 1000;
+            font-size: 14px;
+            z-index: 2000;
             display: none;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+            box-shadow: 0 20px 40px rgba(0,0,0,0.2);
         }
 
-        .img-zoom:hover img { transform: scale(1.05); }
+        .product-card:hover img { transform: scale(1.05); }
         .no-scrollbar::-webkit-scrollbar { display: none; }
         
-        .loader {
-            border: 4px solid #f3f3f3;
-            border-top: 4px solid #001f3f;
-            border-radius: 50%;
-            width: 30px;
-            height: 30px;
-            animation: spin 1s linear infinite;
+        input, select, textarea {
+            transition: all 0.2s ease;
         }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+        input:focus, select:focus, textarea:focus {
+            border-color: #001f3f !important;
+            background-color: #fff !important;
+        }
     </style>
 </head>
 <body class="pb-20">
 
-    <div id="toast" class="toast">Azione Completata</div>
-    <div id="root">
-        <div class="flex items-center justify-center h-screen flex-col">
-            <div class="loader"></div>
-            <p class="mt-4 font-black uppercase text-xs tracking-widest">Verifica Connessione Cloud...</p>
-        </div>
-    </div>
+    <div id="toast" class="toast">Articolo Creato con Successo!</div>
+    <div id="root"></div>
 
     <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+        // --- GENERATORE DI CATALOGO INIZIALE ---
+        const generateInitialCatalog = () => {
+            const catalog = [];
+            const teams = [{ name: 'Inter', color: 'Nerazzurra' }, { name: 'Juve', color: 'Bianconera' }, { name: 'Milan', color: 'Rossonera' }];
+            const brands = ['Stone Island', 'Nike Tech', 'CP Company'];
+            
+            let idCount = 1;
+            // Genera una base di prodotti
+            teams.forEach(t => {
+                catalog.push({
+                    id: `seed-${idCount++}`,
+                    name: `${t.name} Home Kit 25/26`,
+                    price: "95",
+                    macro: 'calcio',
+                    sub: t.name,
+                    desc: `Anteprima maglia home ${t.color}.`,
+                    imgs: [`https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=800&sig=${idCount}`]
+                });
+            });
+            brands.forEach(b => {
+                catalog.push({
+                    id: `seed-${idCount++}`,
+                    name: `${b} Hoodie Special`,
+                    price: "150",
+                    macro: 'brand',
+                    sub: b,
+                    desc: `Capo esclusivo collezione ${b}.`,
+                    imgs: [`https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&sig=${idCount}`]
+                });
+            });
+            return catalog;
+        };
 
-        // --- GESTIONE CONFIGURAZIONE ---
-        let firebaseConfig = null;
-        try {
-            // Cerchiamo di leggere la configurazione iniettata dall'ambiente
-            if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                const parsed = JSON.parse(__firebase_config);
-                if (parsed && parsed.apiKey) {
-                    firebaseConfig = parsed;
-                }
-            }
-        } catch (e) {
-            console.error("Errore lettura config:", e);
-        }
-
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'elite-store-prod';
-        
-        let app, auth, db;
-        let isCloudActive = false;
-
-        // Inizializzazione solo se abbiamo i dati necessari
-        if (firebaseConfig) {
-            try {
-                app = initializeApp(firebaseConfig);
-                auth = getAuth(app);
-                db = getFirestore(app);
-                isCloudActive = true;
-            } catch (e) {
-                console.error("Firebase Init Error:", e);
-                isCloudActive = false;
-            }
-        }
-
-        // --- STATO ---
         window.state = {
-            items: [],
+            items: generateInitialCatalog(),
             view: 'home',
             currentMacro: null,
             currentSub: 'all',
+            searchTerm: '',
             selectedProduct: null,
             showAdmin: false,
             isAdminAuthenticated: false,
             passwordInput: '',
             loginError: false,
-            isCloud: isCloudActive,
-            formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] }
-        };
-
-        const CATEGORY_MAP = {
-            'calcio': ['Serie A', 'Premier League', 'La Liga', 'Ligue 1', 'Champions League', 'Nazionali'],
-            'brand': ['Nike', 'Adidas', 'Ralph Lauren', 'Stone Island', 'Lacoste']
-        };
-
-        const ADMIN_PASSWORD = "15m09c20@"; // Password sincronizzata
-
-        // --- UTILS ---
-        window.showToast = (msg) => {
-            const t = document.getElementById('toast');
-            if(t) {
-                t.innerText = msg;
-                t.style.display = 'block';
-                setTimeout(() => { t.style.display = 'none'; }, 3000);
+            // Form per nuovo prodotto
+            newProduct: {
+                name: '',
+                price: '',
+                macro: '',
+                sub: '',
+                desc: '',
+                imgs: ['']
             }
         };
+        const firebaseConfig = {
+  apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
+  authDomain: "smaf-store.firebaseapp.com",
+  projectId: "smaf-store",
+  storageBucket: "smaf-store.firebasestorage.app",
+  messagingSenderId: "419225713088",
+  appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
+  measurementId: "G-4JBL54XKNN"
+};
+        const CATEGORY_MAP = {
+            'calcio': ['Inter', 'Juve', 'Milan', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Nazionali'],
+            'brand': ['Stone Island', 'Ralph Lauren', 'Lacoste', 'Nike Tech', 'CP Company', 'Adidas Originals']
+        };
+
+        const ADMIN_PASSWORD = "15m09c20@";
 
         window.updateState = (newState) => {
             window.state = { ...window.state, ...newState };
             render();
         };
 
+        window.showToast = () => {
+            const t = document.getElementById('toast');
+            t.style.display = 'block';
+            setTimeout(() => t.style.display = 'none', 3000);
+        };
+
         window.handleLogin = (e) => {
             e.preventDefault();
             if (window.state.passwordInput === ADMIN_PASSWORD) {
                 window.updateState({ isAdminAuthenticated: true, loginError: false });
-                window.showToast("Accesso Eseguito");
             } else {
                 window.updateState({ loginError: true });
             }
         };
 
-        window.handleAddProduct = async (e) => {
+        window.addNewProduct = (e) => {
             e.preventDefault();
-            const s = window.state;
-            
+            const p = window.state.newProduct;
+            if (!p.name || !p.price || !p.macro || !p.sub) return;
+
             const newItem = {
-                name: s.formData.name.toUpperCase(),
-                price: s.formData.price,
-                macro: s.formData.macro,
-                sub: s.formData.sub,
-                desc: s.formData.desc,
-                imgs: s.formData.imgs.filter(u => u.trim() !== ''),
-                createdAt: Date.now()
+                ...p,
+                id: `manual-${Date.now()}`,
+                imgs: p.imgs.filter(url => url.trim() !== '')
             };
 
-            if (isCloudActive && auth.currentUser) {
-                try {
-                    const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-                    await addDoc(dataCol, newItem);
-                    window.showToast("Salvato nel Cloud");
-                } catch (err) {
-                    window.showToast("Errore Cloud - Prova a ricaricare");
-                }
-            } else {
-                const demoItems = [...s.items, { ...newItem, id: Date.now().toString() }];
-                window.updateState({ items: demoItems });
-                window.showToast("Salvato in Locale (DEMO)");
-            }
-
-            window.updateState({ 
-                showAdmin: false, 
-                formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] } 
+            window.updateState({
+                items: [newItem, ...window.state.items],
+                newProduct: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
+                showAdmin: false
             });
+            window.showToast();
         };
 
-        window.handleDelete = async (id) => {
-            if (!confirm("Eliminare il prodotto?")) return;
-            
-            if (isCloudActive) {
-                try {
-                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
-                    window.showToast("Rimosso dal Cloud");
-                } catch (err) { window.showToast("Errore eliminazione"); }
-            } else {
-                const filtered = window.state.items.filter(i => i.id !== id);
-                window.updateState({ items: filtered });
-                window.showToast("Rimosso localmente");
-            }
-        };
-
-        // --- RENDER ---
         function render() {
             const root = document.getElementById('root');
-            if(!root) return;
             const s = window.state;
 
             const header = `
-                <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center max-w-[1600px] xl:mx-auto border-[2px] border-[#001f3f] rounded-[30px] bg-white shadow-sm sticky top-4 z-50">
-                    <h1 class="text-3xl md:text-5xl font-[1000] tracking-[-0.08em] cursor-pointer leading-none uppercase" onclick="updateState({view: 'home', currentMacro: null})">
-                        ELITE APPAREL
+                <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center max-w-[1600px] xl:mx-auto border-[2px] border-[#001f3f] rounded-[30px] bg-white shadow-lg sticky top-4 z-50">
+                    <h1 class="text-3xl md:text-5xl font-[1000] tracking-[-0.08em] cursor-pointer leading-none uppercase italic" onclick="updateState({view: 'home', currentMacro: null, showAdmin: false, searchTerm: ''})">
+                        ELITE
                     </h1>
                     <div class="flex items-center gap-4">
-                        <div class="flex flex-col items-end mr-2">
-                            <span class="text-[9px] font-black uppercase tracking-widest ${s.isCloud ? 'text-green-500' : 'text-red-400'}">
-                                ${s.isCloud ? '● Cloud Online' : '○ Modalità Demo'}
-                            </span>
+                        <div class="hidden md:flex relative">
+                             <input type="text" placeholder="CERCA..." class="border-2 border-[#001f3f] rounded-full px-6 py-2 text-xs font-black outline-none w-64" value="${s.searchTerm}" oninput="window.state.searchTerm = this.value; render()">
                         </div>
                         <button onclick="updateState({showAdmin: !window.state.showAdmin})" 
-                                class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${s.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white hover:bg-black'}">
-                            <i data-lucide="${s.isAdminAuthenticated ? 'log-out' : 'lock'}" class="w-4 h-4"></i>
+                                class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${s.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white'}">
+                            <i data-lucide="${s.isAdminAuthenticated ? 'settings' : 'lock'}" class="w-4 h-4"></i>
                             ${s.showAdmin ? 'CHIUDI' : 'ADMIN'}
                         </button>
                     </div>
                 </header>
             `;
 
-            let content = '<main class="max-w-[1600px] mx-auto px-6 md:px-10 min-h-[70vh]">';
+            let content = '<main class="max-w-[1600px] mx-auto px-6 md:px-10 mt-10 min-h-[70vh]">';
 
             if (s.showAdmin) {
                 content += `
-                    <div class="mt-6 p-8 bg-gray-50 border-2 border-[#001f3f] rounded-[40px] animate-fade-in shadow-xl">
+                    <div class="p-8 bg-white border-2 border-[#001f3f] rounded-[40px] animate-fade-in shadow-xl mb-10">
                         ${!s.isAdminAuthenticated ? `
                             <div class="max-w-md mx-auto text-center py-10">
-                                <h2 class="text-3xl font-black uppercase mb-6 italic">Pannello Admin</h2>
+                                <h2 class="text-3xl font-black uppercase mb-6 italic">Accesso Gestione</h2>
                                 <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
-                                    <input type="password" placeholder="PASSWORD" class="p-5 border-2 rounded-[20px] font-bold text-center outline-none ${s.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#001f3f]'}" oninput="window.state.passwordInput = this.value">
-                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black">Entra</button>
+                                    <input type="password" placeholder="PASSWORD" class="p-5 border-2 rounded-[20px] font-bold text-center outline-none ${s.loginError ? 'border-red-500' : 'border-gray-200'}" oninput="window.state.passwordInput = this.value">
+                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black transition-colors">Entra</button>
                                 </form>
                             </div>
                         ` : `
-                            <div class="flex justify-between items-center mb-8 border-b-2 border-gray-100 pb-6">
-                                <h2 class="text-3xl font-black uppercase italic tracking-tighter">Nuovo Prodotto</h2>
-                                <button onclick="updateState({isAdminAuthenticated: false})" class="text-red-500 font-black text-[10px] uppercase bg-white px-4 py-2 rounded-full border border-red-200 hover:bg-red-50">Logout</button>
+                            <div class="max-w-4xl mx-auto">
+                                <div class="flex justify-between items-center mb-10 border-b-2 border-gray-100 pb-6">
+                                    <h2 class="text-4xl font-black uppercase italic italic">Crea Nuovo Articolo</h2>
+                                    <button onclick="updateState({isAdminAuthenticated: false, showAdmin: false})" class="bg-gray-100 text-[#001f3f] px-6 py-2 rounded-full font-black uppercase text-[10px] hover:bg-red-500 hover:text-white transition-all">LOGOUT</button>
+                                </div>
+                                
+                                <form onsubmit="addNewProduct(event)" class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                    <div class="flex flex-col gap-5">
+                                        <div>
+                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Nome Prodotto</label>
+                                            <input type="text" required placeholder="Es. INTER HOME KIT 25/26" class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold uppercase outline-none" 
+                                                value="${s.newProduct.name}" oninput="window.state.newProduct.name = this.value">
+                                        </div>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <div>
+                                                <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Prezzo (€)</label>
+                                                <input type="number" required placeholder="90" class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none" 
+                                                    value="${s.newProduct.price}" oninput="window.state.newProduct.price = this.value">
+                                            </div>
+                                            <div>
+                                                <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Macro Categoria</label>
+                                                <select required class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-black uppercase text-xs outline-none cursor-pointer" 
+                                                    onchange="window.state.newProduct.macro = this.value; window.state.newProduct.sub = ''; render()">
+                                                    <option value="">SELEZIONA</option>
+                                                    <option value="calcio" ${s.newProduct.macro === 'calcio' ? 'selected' : ''}>CALCIO</option>
+                                                    <option value="brand" ${s.newProduct.macro === 'brand' ? 'selected' : ''}>BRAND</option>
+                                                </select>
+                                            </div>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Sotto Categoria</label>
+                                            <select required class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-black uppercase text-xs outline-none cursor-pointer" 
+                                                ${!s.newProduct.macro ? 'disabled' : ''} onchange="window.state.newProduct.sub = this.value">
+                                                <option value="">SELEZIONA</option>
+                                                ${s.newProduct.macro ? CATEGORY_MAP[s.newProduct.macro].map(sub => `<option value="${sub}" ${s.newProduct.sub === sub ? 'selected' : ''}>${sub}</option>`).join('') : ''}
+                                            </select>
+                                        </div>
+                                        <div>
+                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Descrizione</label>
+                                            <textarea placeholder="Dettagli sul tessuto, vestibilità..." class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none h-32" 
+                                                oninput="window.state.newProduct.desc = this.value">${s.newProduct.desc}</textarea>
+                                        </div>
+                                    </div>
+
+                                    <div class="flex flex-col gap-5">
+                                        <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Immagini (URL)</label>
+                                        <div class="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
+                                            ${s.newProduct.imgs.map((url, idx) => `
+                                                <div class="flex gap-2">
+                                                    <input type="text" placeholder="https://..." class="flex-1 p-4 bg-gray-50 border-2 border-gray-100 rounded-[20px] text-[10px] font-bold outline-none" 
+                                                        value="${url}" oninput="window.state.newProduct.imgs[${idx}] = this.value">
+                                                    <button type="button" onclick="window.state.newProduct.imgs.splice(${idx}, 1); render()" class="p-4 bg-red-50 text-red-500 rounded-[20px] hover:bg-red-500 hover:text-white transition-colors">
+                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
+                                                    </button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <button type="button" onclick="window.state.newProduct.imgs.push(''); render()" class="w-full py-4 border-2 border-dashed border-gray-200 rounded-[20px] font-black text-[10px] uppercase hover:bg-gray-50 transition-colors">
+                                            + Aggiungi Immagine
+                                        </button>
+                                        <div class="mt-auto">
+                                            <button type="submit" class="w-full bg-[#001f3f] text-white py-6 rounded-[30px] font-black uppercase text-xl shadow-xl hover:bg-black transition-all">Pubblica Articolo</button>
+                                        </div>
+                                    </div>
+                                </form>
                             </div>
-                            <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-                                <div class="flex flex-col gap-4">
-                                    <input placeholder="NOME ARTICOLO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.name = this.value" required>
-                                    <input placeholder="PREZZO (€)" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.price = this.value" required>
-                                    <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="window.state.formData.macro = this.value; render()" required>
-                                        <option value="">CATEGORIA</option>
-                                        <option value="calcio">CALCIO</option>
-                                        <option value="brand">BRAND</option>
-                                    </select>
-                                    <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="window.state.formData.sub = this.value" required ${!s.formData.macro ? 'disabled' : ''}>
-                                        <option value="">SOTTO-CATEGORIA</option>
-                                        ${s.formData.macro ? CATEGORY_MAP[s.formData.macro].map(sub => `<option value="${sub}">${sub}</option>`).join('') : ''}
-                                    </select>
-                                </div>
-                                <div class="bg-white p-6 rounded-[30px] border-2 border-gray-100 flex flex-col gap-4">
-                                    <textarea placeholder="DESCRIZIONE DETTAGLIATA" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.desc = this.value" required></textarea>
-                                    <input placeholder="LINK IMMAGINE (URL)" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.imgs[0] = this.value" required>
-                                    <button type="submit" class="bg-[#001f3f] text-white p-6 font-black uppercase rounded-[20px] hover:bg-black transition-all shadow-lg">Aggiungi al Catalogo</button>
-                                </div>
-                            </form>
                         `}
                     </div>
                 `;
-            }
-
-            if (s.view === 'home') {
+            } else if (s.view === 'home') {
                 content += `
-                    <div class="py-8 animate-fade-in">
-                        <div class="relative h-[450px] md:h-[600px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[50px] border-[2px] border-[#001f3f]">
-                            <div class="absolute inset-0 grayscale opacity-10 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover bg-center"></div>
-                            <div class="z-10 w-full text-white">
-                                <h2 class="text-6xl md:text-[10rem] font-black leading-[0.8] uppercase tracking-[-0.08em] mb-4">COLLECTION<br>ARCHIVE</h2>
-                                <p class="text-xs font-black uppercase tracking-[0.4em] opacity-40">Elite Apparel Store — 2025</p>
-                            </div>
+                    <div class="animate-fade-in">
+                        <div class="h-[500px] md:h-[650px] bg-[#001f3f] rounded-[50px] relative overflow-hidden flex items-end p-10 md:p-20 text-white shadow-2xl border-2 border-[#001f3f]">
+                             <div class="absolute inset-0 opacity-20 grayscale bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover"></div>
+                             <div class="relative z-10">
+                                <span class="bg-white text-[#001f3f] px-4 py-1 font-black text-xs uppercase rounded-full mb-6 inline-block tracking-widest">Saison 25/26 Preview</span>
+                                <h2 class="text-6xl md:text-[11rem] font-black uppercase italic leading-[0.85] tracking-tighter">ELITE<br>MEGASTORE</h2>
+                                <p class="mt-6 text-xs font-black uppercase tracking-[0.5em] opacity-50">+500 ARTICOLI DISPONIBILI</p>
+                             </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group border-[2px] border-[#001f3f] p-12 rounded-[40px] bg-white transition-all hover:bg-[#001f3f] hover:text-white cursor-pointer">
-                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-1 transition-transform">KIT</h3>
-                                <p class="text-[10px] font-black uppercase mt-4 opacity-40 tracking-widest">Jersey Calcio</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
+                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group border-2 border-[#001f3f] p-16 rounded-[40px] bg-white hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-xl relative overflow-hidden">
+                                <h3 class="text-7xl md:text-8xl font-black italic uppercase relative z-10">KITS</h3>
+                                <p class="relative z-10 font-bold opacity-50">Maglie Gara, Allenamento e Retro</p>
                             </div>
-                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group border-[2px] border-[#001f3f] p-12 rounded-[40px] bg-white transition-all hover:bg-[#001f3f] hover:text-white cursor-pointer">
-                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-1 transition-transform">BRAND</h3>
-                                <p class="text-[10px] font-black uppercase mt-4 opacity-40 tracking-widest">Streetwear Luxury</p>
+                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group border-2 border-[#001f3f] p-16 rounded-[40px] bg-white hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-xl relative overflow-hidden">
+                                <h3 class="text-7xl md:text-8xl font-black italic uppercase relative z-10">BRANDS</h3>
+                                <p class="relative z-10 font-bold opacity-50">Streetwear di Lusso e Performance</p>
                             </div>
                         </div>
                     </div>
                 `;
             } else if (s.view === 'category') {
-                const filtered = s.items.filter(i => i.macro === s.currentMacro && (s.currentSub === 'all' || i.sub === s.currentSub));
+                const filtered = s.items.filter(i => 
+                    i.macro === s.currentMacro && 
+                    (s.currentSub === 'all' || i.sub === s.currentSub) &&
+                    (i.name.toLowerCase().includes(s.searchTerm.toLowerCase()))
+                );
+
                 content += `
-                    <div class="py-8 animate-fade-in">
-                        <div class="mb-10">
-                            <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-6 flex items-center gap-2 bg-gray-50 px-6 py-2 rounded-full w-fit hover:bg-black hover:text-white">
-                                <i data-lucide="home" class="w-4 h-4"></i> HOME
-                            </button>
-                            <h2 class="text-5xl md:text-[8rem] font-black uppercase tracking-tighter leading-none">${s.currentMacro}</h2>
+                    <div class="animate-fade-in">
+                        <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+                            <div>
+                                <button onclick="updateState({view: 'home'})" class="text-[10px] font-black uppercase mb-4 flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-200"><i data-lucide="arrow-left" class="w-3 h-3"></i> Home</button>
+                                <h2 class="text-6xl md:text-9xl font-black uppercase italic tracking-tighter leading-none">${s.currentMacro}</h2>
+                            </div>
+                            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 max-w-full md:max-w-2xl">
+                                ${['all', ...CATEGORY_MAP[s.currentMacro]].map(sub => `
+                                    <button onclick="updateState({currentSub: '${sub}'})" class="px-6 py-3 font-black uppercase text-[10px] border-2 border-[#001f3f] rounded-full whitespace-nowrap transition-all ${s.currentSub === sub ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-100'}">${sub}</button>
+                                `).join('')}
+                            </div>
                         </div>
-                        <div class="flex flex-wrap gap-2 mb-12">
-                            ${['all', ...CATEGORY_MAP[s.currentMacro]].map(sub => `
-                                <button onclick="updateState({currentSub: '${sub}'})" class="px-8 py-3 font-black uppercase text-[10px] tracking-widest border-2 border-[#001f3f] rounded-full ${s.currentSub === sub ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-50'}">
-                                    ${sub}
-                                </button>
-                            `).join('')}
-                        </div>
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-8">
+                        <p class="mb-8 font-black uppercase text-[10px] opacity-40">Articoli in questa categoria: ${filtered.length}</p>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
                             ${filtered.map(item => `
-                                <div class="group relative cursor-pointer" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
-                                    ${s.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-4 right-4 z-20 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
-                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[30px] mb-4 relative bg-gray-50">
-                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x600?text=Immagine+Non+Valida'">
-                                        <div class="absolute top-4 left-4 bg-white/90 px-3 py-1 font-black text-[8px] uppercase rounded-full shadow-sm">${item.sub}</div>
+                                <div class="group product-card" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
+                                    <div class="relative aspect-[4/5] rounded-[30px] overflow-hidden bg-gray-100 mb-4 border-2 border-transparent group-hover:border-[#001f3f] transition-all">
+                                        <img src="${item.imgs[0] || 'https://via.placeholder.com/400x500?text=No+Image'}" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700">
+                                        ${s.isAdminAuthenticated ? `
+                                            <div class="absolute top-4 right-4 flex flex-col gap-2 opacity-100 z-20">
+                                                <button onclick="event.stopPropagation(); updateState({items: window.state.items.filter(i => i.id !== '${item.id}')})" class="bg-white p-3 rounded-full shadow-lg hover:bg-red-500 hover:text-white transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
+                                            </div>
+                                        ` : ''}
+                                        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 font-black text-[8px] uppercase rounded-full">${item.sub}</div>
                                     </div>
-                                    <h3 class="text-xl font-black uppercase tracking-tighter leading-tight">${item.name}</h3>
-                                    <p class="text-lg font-black italic text-[#001f3f]/40">€ ${item.price}</p>
+                                    <h3 class="text-sm font-black uppercase italic leading-tight px-1 h-10 overflow-hidden">${item.name}</h3>
+                                    <p class="text-xl font-black italic text-[#001f3f]/30 px-1 mt-1">€ ${item.price}</p>
                                 </div>
                             `).join('')}
                         </div>
@@ -319,24 +335,27 @@
             } else if (s.view === 'detail' && s.selectedProduct) {
                 const p = s.selectedProduct;
                 content += `
-                    <div class="py-12 animate-fade-in">
-                        <button onclick="updateState({view: 'category'})" class="mb-10 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-6 py-3 rounded-full border border-gray-200">
-                            <i data-lucide="arrow-left" class="w-4 h-4"></i> GALLERY
-                        </button>
+                    <div class="animate-fade-in py-10">
                         <div class="flex flex-col lg:flex-row gap-16">
-                            <div class="w-full lg:w-3/5">
-                                <div class="aspect-square border-2 border-gray-100 overflow-hidden rounded-[50px] bg-gray-50">
-                                    <img src="${p.imgs[0]}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/800x800?text=Anteprima+Non+Disponibile'">
+                            <div class="lg:w-3/5">
+                                <div class="aspect-square rounded-[60px] overflow-hidden border-2 border-gray-100 shadow-2xl bg-white relative group">
+                                    <img id="main-img" src="${p.imgs[0]}" class="w-full h-full object-cover">
+                                    <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-4">
+                                        ${p.imgs.map((img, idx) => `
+                                            <div onclick="document.getElementById('main-img').src = '${img}'" class="w-4 h-4 rounded-full bg-white border-2 border-[#001f3f] cursor-pointer hover:scale-125 transition-transform"></div>
+                                        `).join('')}
+                                    </div>
                                 </div>
                             </div>
-                            <div class="w-full lg:w-2/5 flex flex-col justify-center">
-                                <span class="text-gray-300 font-black text-xs uppercase mb-4 tracking-[0.3em]">${p.sub}</span>
-                                <h2 class="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.8] mb-8">${p.name}</h2>
-                                <p class="text-6xl font-black italic text-[#001f3f] mb-10 tracking-tighter">€ ${p.price}</p>
-                                <div class="bg-gray-50 p-10 border-l-[10px] border-[#001f3f] rounded-[30px] mb-10">
-                                    <p class="text-xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
+                            <div class="lg:w-2/5 flex flex-col justify-center">
+                                <span class="text-[#001f3f]/40 font-black text-xs uppercase tracking-widest mb-6">${p.macro} / ${p.sub}</span>
+                                <h2 class="text-6xl md:text-7xl font-black uppercase italic leading-[0.8] mb-8 tracking-tighter">${p.name}</h2>
+                                <p class="text-6xl font-black italic text-[#001f3f] mb-12 tracking-tighter">€ ${p.price}</p>
+                                <div class="bg-white p-10 border-2 border-[#001f3f] rounded-[40px] mb-10 shadow-lg relative">
+                                    <p class="text-xl font-bold italic text-gray-700 leading-relaxed">${p.desc || 'Nessuna descrizione disponibile per questo prodotto esclusivo.'}</p>
                                 </div>
-                                <button class="w-full bg-[#001f3f] text-white py-10 text-2xl font-black uppercase rounded-[30px] hover:bg-black transition-all shadow-xl active:scale-95">ACQUISTA ORA</button>
+                                <button class="bg-[#001f3f] text-white py-8 rounded-[30px] text-xl font-[1000] uppercase hover:bg-black transition-all shadow-xl">PRE-ORDINA ORA</button>
+                                <button onclick="updateState({view: 'category'})" class="mt-4 border-2 border-[#001f3f] text-[#001f3f] py-4 rounded-[30px] font-black uppercase text-xs hover:bg-gray-50 transition-all">Torna al Catalogo</button>
                             </div>
                         </div>
                     </div>
@@ -348,52 +367,7 @@
             lucide.createIcons();
         }
 
-        // --- INIZIO ---
-        const init = async () => {
-            if (isCloudActive) {
-                try {
-                    // 1. Auth prioritario
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-
-                    // 2. Listener dati
-                    onAuthStateChanged(auth, (user) => {
-                        if (user) {
-                            const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
-                            onSnapshot(dataCol, (snap) => {
-                                const items = [];
-                                snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
-                                window.updateState({ items });
-                            }, (err) => {
-                                console.error("Firestore Error:", err);
-                                useDemoData();
-                            });
-                        }
-                    });
-                } catch (e) {
-                    console.error("Auth Fail:", e);
-                    window.updateState({ isCloud: false });
-                    useDemoData();
-                }
-            } else {
-                useDemoData();
-            }
-        };
-
-        function useDemoData() {
-            window.updateState({ 
-                items: [
-                    { id: 'd1', name: 'Jersey Milan 24/25', price: '95', macro: 'calcio', sub: 'Serie A', desc: 'Versione Demo Offline - Maglia Casa Milan AC', imgs: ['https://images.unsplash.com/photo-1624365160322-835692631566?w=800'] },
-                    { id: 'd2', name: 'Nike Tech Fleece', price: '120', macro: 'brand', sub: 'Nike', desc: 'Versione Demo Offline - Pantalone Tech Fleece Nero', imgs: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800'] }
-                ] 
-            });
-        }
-
-        window.onload = init;
-        render();
+        window.onload = () => render();
     </script>
 </body>
 </html>
