@@ -57,7 +57,7 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
         // --- FIREBASE CONFIG ---
@@ -75,8 +75,8 @@
 
         const ADMIN_PASSWORD = "ELITE2025";
 
-        // --- STATO ---
-        let state = {
+        // --- STATO (Esposto globalmente per evitare ReferenceError) ---
+        window.state = {
             items: [],
             view: 'home',
             currentMacro: null,
@@ -103,7 +103,11 @@
 
         async function initAuth() {
             try {
-                await signInAnonymously(auth);
+                if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                    await signInWithCustomToken(auth, __initial_auth_token);
+                } else {
+                    await signInAnonymously(auth);
+                }
             } catch (error) {
                 console.error("Auth error:", error);
             }
@@ -111,6 +115,7 @@
 
         function setupRealtimeUpdates(user) {
             if (!user) return;
+            // RULE 1: Usare sempre il percorso corretto /artifacts/{appId}/public/data/{collectionName}
             const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
             
             onSnapshot(dataCol, (snapshot) => {
@@ -118,42 +123,42 @@
                 snapshot.forEach((doc) => {
                     items.push({ id: doc.id, ...doc.data() });
                 });
-                state.items = items;
-                state.loading = false;
+                window.state.items = items;
+                window.state.loading = false;
                 render();
             }, (error) => {
                 console.error("Firestore error:", error);
-                state.loading = false;
+                window.state.loading = false;
                 render();
             });
         }
 
         // Espongo le funzioni al window per usarle negli attributi HTML (onclick)
         window.updateState = (newState) => {
-            state = { ...state, ...newState };
+            window.state = { ...window.state, ...newState };
             render();
         };
 
         window.handleLogin = (e) => {
             e.preventDefault();
-            if (state.passwordInput === ADMIN_PASSWORD) {
-                state.isAdminAuthenticated = true;
-                state.loginError = false;
+            if (window.state.passwordInput === ADMIN_PASSWORD) {
+                window.state.isAdminAuthenticated = true;
+                window.state.loginError = false;
                 showToast("Accesso Eseguito");
             } else {
-                state.loginError = true;
+                window.state.loginError = true;
             }
             render();
         };
 
         window.handleAddImgField = () => {
-            state.formData.imgs.push('');
+            window.state.formData.imgs.push('');
             render();
         };
 
         window.handleRemoveImgField = (index) => {
-            if (state.formData.imgs.length > 1) {
-                state.formData.imgs.splice(index, 1);
+            if (window.state.formData.imgs.length > 1) {
+                window.state.formData.imgs.splice(index, 1);
                 render();
             }
         };
@@ -162,29 +167,31 @@
             e.preventDefault();
             if (!auth.currentUser) return;
 
-            const validImgs = state.formData.imgs.filter(url => url.trim() !== '');
+            const validImgs = window.state.formData.imgs.filter(url => url.trim() !== '');
             if (validImgs.length === 0) {
                 showToast("Inserisci almeno un'immagine");
                 return;
             }
 
             const newItem = {
-                name: state.formData.name.toUpperCase(),
-                price: state.formData.price,
-                macro: state.formData.macro,
-                sub: state.formData.sub,
-                desc: state.formData.desc,
+                name: window.state.formData.name.toUpperCase(),
+                price: window.state.formData.price,
+                macro: window.state.formData.macro,
+                sub: window.state.formData.sub,
+                desc: window.state.formData.desc,
                 imgs: validImgs,
                 createdAt: Date.now()
             };
 
             try {
-                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), newItem);
+                const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                await addDoc(dataCol, newItem);
                 showToast("Prodotto Pubblicato");
-                state.showAdmin = false;
-                state.formData = { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] };
+                window.state.showAdmin = false;
+                window.state.formData = { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] };
                 render();
             } catch (err) {
+                console.error("Add error:", err);
                 showToast("Errore durante il salvataggio");
             }
         };
@@ -206,6 +213,8 @@
             const root = document.getElementById('root');
             if(!root) return;
             root.innerHTML = '';
+            
+            const state = window.state;
 
             const header = `
                 <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center max-w-[1600px] xl:mx-auto border-[2px] border-[#001f3f] rounded-[30px] bg-white shadow-sm sticky top-4 z-50">
@@ -214,7 +223,7 @@
                     </h1>
                     <div class="flex items-center gap-4">
                         ${state.loading ? '<div class="loader"></div>' : ''}
-                        <button onclick="updateState({showAdmin: !state.showAdmin})" 
+                        <button onclick="updateState({showAdmin: !window.state.showAdmin})" 
                                 class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${state.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white hover:bg-black'}">
                             <i data-lucide="${state.isAdminAuthenticated ? 'log-out' : 'lock'}" class="w-4 h-4"></i>
                             ${state.showAdmin ? 'CHIUDI' : 'ADMIN'}
@@ -236,7 +245,7 @@
                                     <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
                                         <input type="password" placeholder="PASSWORD" 
                                                class="p-5 border-[2px] rounded-[20px] font-bold text-center outline-none ${state.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#001f3f]'}"
-                                               oninput="state.passwordInput = this.value">
+                                               oninput="window.state.passwordInput = this.value">
                                         <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black transition-all">Accedi</button>
                                     </form>
                                 </div>
@@ -247,20 +256,20 @@
                                 </div>
                                 <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div class="flex flex-col gap-4">
-                                        <input placeholder="NOME ARTICOLO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="state.formData.name = this.value" required>
+                                        <input placeholder="NOME ARTICOLO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.name = this.value" required>
                                         <div class="grid grid-cols-2 gap-4">
-                                            <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="state.formData.price = this.value" required>
-                                            <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="state.formData.macro = this.value; render()" required>
+                                            <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.price = this.value" required>
+                                            <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="window.state.formData.macro = this.value; render()" required>
                                                 <option value="">CATEGORIA</option>
                                                 <option value="calcio">CALCIO</option>
                                                 <option value="brand">BRAND</option>
                                             </select>
                                         </div>
-                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="state.formData.sub = this.value" required ${!state.formData.macro ? 'disabled' : ''}>
+                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="window.state.formData.sub = this.value" required ${!state.formData.macro ? 'disabled' : ''}>
                                             <option value="">SOTTO-CATEGORIA</option>
                                             ${state.formData.macro ? CATEGORY_MAP[state.formData.macro].map(s => `<option value="${s}">${s}</option>`).join('') : ''}
                                         </select>
-                                        <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" rows="3" oninput="state.formData.desc = this.value" required></textarea>
+                                        <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" rows="3" oninput="window.state.formData.desc = this.value" required></textarea>
                                     </div>
                                     <div class="flex flex-col gap-4 bg-white p-6 rounded-[30px] border-2 border-gray-100">
                                         <div class="flex justify-between items-center">
@@ -270,7 +279,7 @@
                                         <div class="max-h-[220px] overflow-y-auto pr-2 space-y-3">
                                             ${state.formData.imgs.map((img, idx) => `
                                                 <div class="flex gap-2">
-                                                    <input placeholder="FOTO ${idx + 1}" class="flex-1 p-4 border-2 rounded-[15px] text-xs font-bold" value="${img}" oninput="state.formData.imgs[${idx}] = this.value" required>
+                                                    <input placeholder="FOTO ${idx + 1}" class="flex-1 p-4 border-2 rounded-[15px] text-xs font-bold" value="${img}" oninput="window.state.formData.imgs[${idx}] = this.value" required>
                                                     <button type="button" onclick="handleRemoveImgField(${idx})" class="text-red-500 p-2"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
                                                 </div>
                                             `).join('')}
@@ -327,7 +336,7 @@
                             <div class="w-full md:w-[450px] relative group">
                                 <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6 group-focus-within:text-[#001f3f]"></i>
                                 <input placeholder="CERCA..." class="w-full border-2 border-gray-200 rounded-[30px] p-6 pl-16 text-xl font-black uppercase outline-none focus:border-[#001f3f] transition-all bg-gray-50 focus:bg-white" 
-                                       value="${state.searchTerm}" oninput="state.searchTerm = this.value; render()">
+                                       value="${state.searchTerm}" oninput="window.state.searchTerm = this.value; render()">
                             </div>
                         </div>
                         <div class="flex flex-wrap gap-3 mb-16 no-scrollbar overflow-x-auto pb-4">
@@ -366,8 +375,8 @@
                                     <img src="${p.imgs[state.imgIndex]}" class="w-full h-full object-cover animate-fade-in">
                                 </div>
                                 ${p.imgs.length > 1 ? `
-                                    <button onclick="updateState({imgIndex: (state.imgIndex - 1 + ${p.imgs.length}) % ${p.imgs.length}})" class="absolute left-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-left" class="w-8 h-8"></i></button>
-                                    <button onclick="updateState({imgIndex: (state.imgIndex + 1) % ${p.imgs.length}})" class="absolute right-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-right" class="w-8 h-8"></i></button>
+                                    <button onclick="updateState({imgIndex: (window.state.imgIndex - 1 + ${p.imgs.length}) % ${p.imgs.length}})" class="absolute left-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-left" class="w-8 h-8"></i></button>
+                                    <button onclick="updateState({imgIndex: (window.state.imgIndex + 1) % ${p.imgs.length}})" class="absolute right-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-right" class="w-8 h-8"></i></button>
                                     <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-3">
                                         ${p.imgs.map((_, i) => `<div class="h-1.5 rounded-full transition-all ${i === state.imgIndex ? 'bg-[#001f3f] w-10' : 'bg-gray-300 w-4'}"></div>`).join('')}
                                     </div>
@@ -395,9 +404,17 @@
 
         // --- INIT ---
         window.onload = async () => {
+            // Primo: inizializza l'autenticazione
             await initAuth();
+            
+            // Secondo: ascolta i cambi di stato auth e avvia Firestore solo se autenticato
             onAuthStateChanged(auth, (user) => {
-                if (user) setupRealtimeUpdates(user);
+                if (user) {
+                    setupRealtimeUpdates(user);
+                } else {
+                    // Fallback se l'auth si perde
+                    initAuth();
+                }
             });
         };
     </script>
