@@ -1,0 +1,235 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>STORE</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #ffffff;
+            color: #001f3f;
+            overflow-x: hidden;
+        }
+        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
+        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
+        .custom-scrollbar::-webkit-scrollbar-thumb { background: #001f3f; border-radius: 10px; }
+        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
+        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
+    </style>
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+
+        // Componenti Icone SVG Inline per evitare dipendenze esterne instabili
+        const Icons = {
+            Lock: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            ),
+            Settings: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1V11a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+            ),
+            Trash: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
+            ),
+            Plus: () => (
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
+            ),
+            ChevronLeft: () => (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            ),
+            Search: () => (
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
+            )
+        };
+
+        const CATEGORY_MAP = {
+            'calcio': ['Serie A', 'Premier League', 'La Liga', 'Ligue 1', 'Champions League', 'Nazionali'],
+            'brand': ['Nike', 'Adidas', 'Ralph Lauren', 'Stone Island', 'Lacoste']
+        };
+
+        const ADMIN_PASSWORD = "15m09c20@";
+
+        function App() {
+            const [items, setItems] = useState([
+                { id: '1', name: 'JERSEY MILAN HOME 24/25', price: '89.99', macro: 'calcio', sub: 'Serie A', desc: 'Design iconico.', imgs: ['https://images.unsplash.com/photo-1624365160322-835692631566?w=800'] },
+                { id: '2', name: 'NIKE TECH FLEECE', price: '119.00', macro: 'brand', sub: 'Nike', desc: 'Comfort urbano.', imgs: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800'] }
+            ]);
+
+            const [view, setView] = useState('home');
+            const [currentMacro, setCurrentMacro] = useState(null);
+            const [currentSub, setCurrentSub] = useState('all');
+            const [selectedProduct, setSelectedProduct] = useState(null);
+            const [showAdmin, setShowAdmin] = useState(false);
+            const [isAdminAuth, setIsAdminAuth] = useState(false);
+            const [passInput, setPassInput] = useState('');
+            const [error, setError] = useState(false);
+            const [searchTerm, setSearchTerm] = useState('');
+            const [imgIndex, setImgIndex] = useState(0);
+
+            const [form, setForm] = useState({ name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] });
+
+            const handleLogin = (e) => {
+                e.preventDefault();
+                if (passInput === ADMIN_PASSWORD) {
+                    setIsAdminAuth(true);
+                    setError(false);
+                    setPassInput('');
+                } else {
+                    setError(true);
+                }
+            };
+
+            const addProduct = (e) => {
+                e.preventDefault();
+                const newP = { ...form, id: Date.now().toString(), name: form.name.toUpperCase(), imgs: form.imgs.filter(i => i.trim() !== '') };
+                setItems([...items, newP]);
+                setForm({ name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] });
+            };
+
+            const filtered = items.filter(i => {
+                if (!currentMacro) return false;
+                return i.macro === currentMacro && (currentSub === 'all' || i.sub === currentSub) && i.name.toLowerCase().includes(searchTerm.toLowerCase());
+            });
+
+            return (
+                <div className="min-h-screen pb-20 select-none">
+                    <header className="mt-4 mx-4 md:mx-10 p-6 flex justify-between items-center border-[2px] border-[#001f3f] rounded-[25px] bg-white sticky top-4 z-50">
+                        <h1 onClick={() => { setView('home'); setShowAdmin(false); }} className="text-2xl md:text-4xl font-[900] tracking-tighter cursor-pointer uppercase"></h1>
+                        <button onClick={() => setShowAdmin(!showAdmin)} className={`p-3 px-6 rounded-full font-black text-[10px] flex items-center gap-2 transition-all ${showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white'}`}>
+                            {isAdminAuth ? <Icons.Settings /> : <Icons.Lock />}
+                            {showAdmin ? 'CHIUDI' : 'ADMIN'}
+                        </button>
+                    </header>
+
+                    <main className="max-w-[1400px] mx-auto px-6 mt-8">
+                        {showAdmin && (
+                            <div className="animate-slide-up mb-10">
+                                {!isAdminAuth ? (
+                                    <div className="bg-gray-50 p-10 rounded-[30px] border-[2px] border-[#001f3f] max-w-md mx-auto text-center">
+                                        <h2 className="text-2xl font-black mb-6 uppercase">Accesso Protetto</h2>
+                                        <form onSubmit={handleLogin} className="flex flex-col gap-4">
+                                            <input type="password" placeholder="PASSWORD" className={`p-4 rounded-xl border-2 text-center font-bold outline-none ${error ? 'border-red-500' : 'border-gray-200 focus:border-[#001f3f]'}`} value={passInput} onChange={e => {setPassInput(e.target.value); setError(false);}} autoFocus />
+                                            <button className="bg-[#001f3f] text-white p-4 rounded-xl font-black uppercase">Sblocca</button>
+                                        </form>
+                                    </div>
+                                ) : (
+                                    <div className="bg-gray-50 p-8 rounded-[30px] border-[2px] border-[#001f3f]">
+                                        <div className="flex justify-between items-center mb-8 border-b pb-4">
+                                            <h2 className="text-2xl font-black uppercase">Gestione Inventario</h2>
+                                            <button onClick={() => setIsAdminAuth(false)} className="text-red-500 font-black text-[10px] uppercase">Logout</button>
+                                        </div>
+                                        <form onSubmit={addProduct} className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                            <div className="flex flex-col gap-3">
+                                                <input placeholder="NOME PRODOTTO" className="p-4 border-2 rounded-xl font-bold uppercase" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
+                                                <input placeholder="PREZZO €" className="p-4 border-2 rounded-xl font-bold" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
+                                                <select className="p-4 border-2 rounded-xl font-bold" value={form.macro} onChange={e => setForm({...form, macro: e.target.value, sub: ''})} required>
+                                                    <option value="">MACRO</option>
+                                                    <option value="calcio">CALCIO</option>
+                                                    <option value="brand">BRAND</option>
+                                                </select>
+                                                <select className="p-4 border-2 rounded-xl font-bold" value={form.sub} onChange={e => setForm({...form, sub: e.target.value})} required disabled={!form.macro}>
+                                                    <option value="">SUB</option>
+                                                    {form.macro && CATEGORY_MAP[form.macro].map(s => <option key={s} value={s}>{s}</option>)}
+                                                </select>
+                                            </div>
+                                            <div className="flex flex-col gap-3">
+                                                <div className="flex justify-between"><span className="font-black text-[10px] opacity-40">IMMAGINI URL</span><button type="button" onClick={() => setForm({...form, imgs: [...form.imgs, '']})} className="text-green-600"><Icons.Plus /></button></div>
+                                                {form.imgs.map((im, idx) => (
+                                                    <input key={idx} placeholder="URL Immagine" className="p-3 border-2 rounded-lg text-xs" value={im} onChange={e => { const ni = [...form.imgs]; ni[idx] = e.target.value; setForm({...form, imgs: ni}); }} />
+                                                ))}
+                                                <textarea placeholder="DESCRIZIONE" className="p-4 border-2 rounded-xl font-bold flex-1" value={form.desc} onChange={e => setForm({...form, desc: e.target.value})} />
+                                            </div>
+                                            <button className="md:col-span-2 bg-[#001f3f] text-white p-5 rounded-xl font-black uppercase">Aggiungi al Catalogo</button>
+                                        </form>
+                                    </div>
+                                )}
+                            </div>
+                        )}
+
+                        {view === 'home' && (
+                            <div className="animate-fade-in">
+                                <div className="h-[400px] md:h-[500px] bg-[#001f3f] rounded-[40px] mb-8 flex items-end p-10 relative overflow-hidden">
+                                    <div className="absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=800')] bg-cover bg-center"></div>
+                                    <h2 className="text-6xl md:text-9xl font-[900] text-white leading-none uppercase tracking-tighter z-10">SMAF STORE<br/></h2>
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div onClick={() => {setCurrentMacro('calcio'); setView('category');}} className="p-16 border-4 border-[#001f3f] rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer group shadow-xl">
+                                        <h3 className="text-6xl font-black italic uppercase group-hover:-translate-y-2 transition-transform">KIT</h3>
+                                        <p className="text-xs font-bold opacity-40 uppercase">Calcio Selection</p>
+                                    </div>
+                                    <div onClick={() => {setCurrentMacro('brand'); setView('category');}} className="p-16 border-4 border-[#001f3f] rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer group shadow-xl">
+                                        <h3 className="text-6xl font-black italic uppercase group-hover:-translate-y-2 transition-transform">BRAND</h3>
+                                        <p className="text-xs font-bold opacity-40 uppercase">Streetwear Luxury</p>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'category' && (
+                            <div className="animate-fade-in">
+                                <div className="flex justify-between items-end mb-10">
+                                    <div>
+                                        <button onClick={() => setView('home')} className="flex items-center gap-2 font-black text-[10px] mb-4 opacity-40"><Icons.ChevronLeft /> HOME</button>
+                                        <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter">{currentMacro}</h2>
+                                    </div>
+                                    <div className="relative w-full max-w-[300px] hidden md:block">
+                                        <input placeholder="CERCA..." className="w-full p-4 border-2 rounded-full px-8 font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="flex gap-2 overflow-x-auto pb-4 mb-8 custom-scrollbar">
+                                    {['all', ...CATEGORY_MAP[currentMacro]].map(s => (
+                                        <button key={s} onClick={() => setCurrentSub(s)} className={`px-6 py-2 rounded-full font-black text-[10px] uppercase border-2 transition-all ${currentSub === s ? 'bg-[#001f3f] text-white border-[#001f3f]' : 'border-gray-200'}`}>{s}</button>
+                                    ))}
+                                </div>
+                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+                                    {filtered.map(p => (
+                                        <div key={p.id} onClick={() => {setSelectedProduct(p); setView('detail'); setImgIndex(0);}} className="cursor-pointer group">
+                                            <div className="aspect-[3/4] rounded-[25px] overflow-hidden border-2 mb-4 relative bg-gray-50">
+                                                <img src={p.imgs[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+                                                {isAdminAuth && <button onClick={(e) => {e.stopPropagation(); setItems(items.filter(it => it.id !== p.id));}} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full"><Icons.Trash /></button>}
+                                            </div>
+                                            <h4 className="font-black uppercase tracking-tighter leading-none">{p.name}</h4>
+                                            <p className="text-sm font-bold opacity-40 italic">€ {p.price}</p>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {view === 'detail' && selectedProduct && (
+                            <div className="animate-slide-up flex flex-col md:flex-row gap-12 pt-10">
+                                <div className="w-full md:w-1/2 aspect-square rounded-[40px] overflow-hidden border-2 bg-gray-50">
+                                    <img src={selectedProduct.imgs[imgIndex]} className="w-full h-full object-cover" />
+                                </div>
+                                <div className="w-full md:w-1/2 flex flex-col justify-center">
+                                    <button onClick={() => setView('category')} className="mb-6 opacity-30 font-black text-[10px] uppercase flex items-center gap-2"><Icons.ChevronLeft /> INDIETRO</button>
+                                    <h2 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.8] mb-6">{selectedProduct.name}</h2>
+                                    <p className="text-4xl font-black italic text-[#001f3f] mb-8">€ {selectedProduct.price}</p>
+                                    <div className="p-6 bg-gray-50 rounded-2xl border-l-8 border-[#001f3f] mb-8">
+                                        <p className="font-bold text-gray-600">{selectedProduct.desc}</p>
+                                    </div>
+                                    <button className="w-full bg-[#001f3f] text-white p-8 rounded-[25px] font-black uppercase text-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">Ordina su WhatsApp</button>
+                                </div>
+                            </div>
+                        )}
+                    </main>
+                </div>
+            );
+        }
+
+        const root = ReactDOM.createRoot(document.getElementById('root'));
+        root.render(<App />);
+    </script>
+</body>
+</html>
