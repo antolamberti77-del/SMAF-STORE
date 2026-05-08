@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Apparel Store | Admin Management</title>
+    <title>Elite Apparel Store | Cloud Management</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
@@ -51,65 +51,37 @@
 </head>
 <body class="pb-20">
 
-    <div id="toast" class="toast">Articolo Creato con Successo!</div>
+    <div id="toast" class="toast">Azione Completata!</div>
     <div id="root"></div>
 
     <script type="module">
-        // --- GENERATORE MASSIVO DI CATALOGO (1000+ Articoli) ---
-        const generateMassiveCatalog = () => {
-            const catalog = [];
-            const teams = ['Milan', 'Inter', 'Juve', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Liverpool', 'PSG', 'Bayern', 'Italia', 'Brasile'];
-            const types = ['Home Kit', 'Away Kit', 'Third Kit', 'Training Jersey', 'Retro Classic'];
-            const brands = ['Stone Island', 'Nike Tech', 'CP Company', 'Ralph Lauren', 'Lacoste', 'Stussy'];
-            const clothes = ['Hoodie', 'Cargo', 'T-Shirt', 'Jacket', 'Zip Hoodie'];
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, doc, setDoc, addDoc, deleteDoc, onSnapshot, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-            for (let i = 1; i <= 510; i++) {
-                const team = teams[Math.floor(Math.random() * teams.length)];
-                const type = types[Math.floor(Math.random() * types.length)];
-                catalog.push({
-                    id: `kit-${i}`,
-                    name: `${team} ${type} 25/26`.toUpperCase(),
-                    price: (Math.random() * (120 - 75) + 75).toFixed(0),
-                    macro: 'calcio',
-                    sub: team,
-                    desc: `Maglia ufficiale ${team} versione ${type}. Alta qualità.`,
-                    imgs: [`https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=800&sig=${i}`]
-                });
-            }
-
-            for (let i = 1; i <= 510; i++) {
-                const brand = brands[Math.floor(Math.random() * brands.length)];
-                const itemType = clothes[Math.floor(Math.random() * clothes.length)];
-                catalog.push({
-                    id: `brand-${i}`,
-                    name: `${brand} ${itemType} Collection`.toUpperCase(),
-                    price: (Math.random() * (200 - 50) + 50).toFixed(0),
-                    macro: 'brand',
-                    sub: brand,
-                    desc: `Capo esclusivo della collezione ${brand}. Design premium.`,
-                    imgs: [`https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&sig=${i + 500}`]
-                });
-            }
-            return catalog;
-        };
+        // Configurazione Firebase
         const firebaseConfig = {
-  apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
-  authDomain: "smaf-store.firebaseapp.com",
-  projectId: "smaf-store",
-  storageBucket: "smaf-store.firebasestorage.app",
-  messagingSenderId: "419225713088",
-  appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
-  measurementId: "G-4JBL54XKNN"
-};
-        const CATEGORY_MAP = {
-            'calcio': ['Inter', 'Juve', 'Milan', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Nazionali', 'Liverpool', 'PSG', 'Bayern', 'Italia', 'Brasile'],
-            'brand': ['Stone Island', 'Ralph Lauren', 'Lacoste', 'Nike Tech', 'CP Company', 'Adidas Originals', 'Stussy']
+            apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
+            authDomain: "smaf-store.firebaseapp.com",
+            projectId: "smaf-store",
+            storageBucket: "smaf-store.firebasestorage.app",
+            messagingSenderId: "419225713088",
+            appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
+            measurementId: "G-4JBL54XKNN"
         };
 
-        const ADMIN_PASSWORD = "15m09c20@";
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'smaf-store-default';
 
+        // Dati di fallback nel caso Firebase non sia configurato
+        const MOCK_DATA = [
+            { id: 'm1', name: 'MAGLIA INTER HOME 24/25', price: '95', macro: 'calcio', sub: 'Inter', desc: 'Design ufficiale 2024/25 con ricami di alta qualità.', imgs: ['https://images.unsplash.com/photo-1522778119026-d647f0596c20?w=800'] },
+            { id: 'm2', name: 'FELPA RALPH LAUREN', price: '120', macro: 'brand', sub: 'Ralph Lauren', desc: 'Cotone premium, vestibilità classica.', imgs: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800'] }
+        ];
+
+        // Stato globale dell'app
         window.state = {
-            items: generateMassiveCatalog(),
+            items: [],
+            user: null,
             view: 'home',
             currentMacro: null,
             currentSub: 'all',
@@ -120,6 +92,9 @@
             passwordInput: '',
             loginError: false,
             formError: false,
+            isSaving: false,
+            dbConnected: false,
+            authConfigError: false,
             newProduct: {
                 name: '',
                 price: '',
@@ -130,13 +105,62 @@
             }
         };
 
+        const CATEGORY_MAP = {
+            'calcio': ['Inter', 'Juve', 'Milan', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Nazionali', 'Liverpool', 'PSG', 'Bayern', 'Italia', 'Brasile'],
+            'brand': ['Stone Island', 'Ralph Lauren', 'Lacoste', 'Nike Tech', 'CP Company', 'Adidas Originals', 'Stussy']
+        };
+
+        const ADMIN_PASSWORD = "15m09c20@";
+
+        let app, auth, db;
+        
+        const setupFirebase = async () => {
+            try {
+                app = initializeApp(firebaseConfig);
+                auth = getAuth(app);
+                db = getFirestore(app);
+
+                // Tentativo di accesso con gestione errori specifica per il provider disabilitato
+                try {
+                    await signInAnonymously(auth);
+                } catch (err) {
+                    if (err.code === 'auth/configuration-not-found' || err.code === 'auth/operation-not-allowed') {
+                        console.warn("Firebase Auth: Il provider Anonimo non è attivo. Uso dati Locali/Mock.");
+                        window.updateState({ authConfigError: true, items: MOCK_DATA });
+                        return; // Esci senza attivare Firestore real-time
+                    }
+                    throw err;
+                }
+
+                // Se l'auth ha successo, attiva i listener Firestore
+                onAuthStateChanged(auth, (user) => {
+                    if (user) {
+                        window.updateState({ user, dbConnected: true, authConfigError: false });
+                        const q = collection(db, 'artifacts', appId, 'public', 'data', 'products');
+                        onSnapshot(q, (snapshot) => {
+                            const products = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                            // Se non ci sono prodotti sul DB, usa i mock solo per mostrare qualcosa inizialmente
+                            window.updateState({ items: products.length > 0 ? products : MOCK_DATA });
+                        }, (error) => {
+                            console.error("Firestore Error:", error);
+                        });
+                    }
+                });
+
+            } catch (e) {
+                console.error("Errore critico Firebase:", e);
+                window.updateState({ dbConnected: false, items: MOCK_DATA });
+            }
+        };
+
         window.updateState = (newState) => {
             window.state = { ...window.state, ...newState };
             render();
         };
 
-        window.showToast = (msg = "Articolo Creato!") => {
+        window.showToast = (msg) => {
             const t = document.getElementById('toast');
+            if(!t) return;
             t.innerText = msg;
             t.style.display = 'block';
             setTimeout(() => t.style.display = 'none', 3000);
@@ -151,7 +175,7 @@
             }
         };
 
-        window.addNewProduct = (e) => {
+        window.addNewProduct = async (e) => {
             e.preventDefault();
             const p = window.state.newProduct;
             
@@ -160,24 +184,56 @@
                 return;
             }
 
+            const cleanImgs = p.imgs.filter(url => url.trim() !== '');
             const newItem = {
-                ...p,
-                id: `manual-${Date.now()}`,
                 name: p.name.toUpperCase(),
-                imgs: p.imgs.filter(url => url.trim() !== '')
+                price: p.price,
+                macro: p.macro,
+                sub: p.sub,
+                desc: p.desc,
+                imgs: cleanImgs.length > 0 ? cleanImgs : ['https://via.placeholder.com/800?text=Elite+Apparel'],
+                createdAt: Date.now()
             };
 
-            if (newItem.imgs.length === 0) {
-                newItem.imgs = ['https://via.placeholder.com/800?text=No+Image'];
+            if (!window.state.dbConnected) {
+                // Mock add per sessione locale
+                window.updateState({
+                    items: [{id: 'temp-' + Date.now(), ...newItem}, ...window.state.items],
+                    newProduct: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
+                    showAdmin: false,
+                    formError: false
+                });
+                window.showToast("Salvato localmente (Demo)");
+                return;
             }
 
-            window.updateState({
-                items: [newItem, ...window.state.items],
-                newProduct: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
-                showAdmin: false,
-                formError: false
-            });
-            window.showToast("Articolo Pubblicato!");
+            window.updateState({ isSaving: true });
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), newItem);
+                window.updateState({
+                    newProduct: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
+                    showAdmin: false,
+                    formError: false,
+                    isSaving: false
+                });
+                window.showToast("Articolo salvato nel Cloud!");
+            } catch (err) {
+                window.updateState({ isSaving: false });
+                window.showToast("Errore di connessione");
+            }
+        };
+
+        window.deleteProduct = async (id) => {
+            if (!window.state.dbConnected) {
+                window.updateState({ items: window.state.items.filter(i => i.id !== id) });
+                return;
+            }
+            try {
+                await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                window.showToast("Eliminato");
+            } catch (err) {
+                console.error(err);
+            }
         };
 
         function render() {
@@ -204,6 +260,18 @@
 
             let content = '<main class="max-w-[1600px] mx-auto px-6 md:px-10 mt-10 min-h-[70vh]">';
 
+            // Alert specifico per lo sviluppatore/admin
+            if (s.authConfigError && s.showAdmin) {
+                content += `
+                    <div class="mb-6 p-4 bg-orange-50 border-2 border-orange-200 rounded-2xl flex items-center gap-4 text-orange-800">
+                        <i data-lucide="info" class="w-5 h-5"></i>
+                        <p class="text-[10px] font-black uppercase">
+                            Nota: Abilita "Anonymous" in Firebase Console > Authentication > Sign-in Method per salvare i dati nel Cloud.
+                        </p>
+                    </div>
+                `;
+            }
+
             if (s.showAdmin) {
                 content += `
                     <div class="p-8 bg-white border-2 border-[#001f3f] rounded-[40px] animate-fade-in shadow-xl mb-10">
@@ -212,73 +280,46 @@
                                 <h2 class="text-3xl font-black uppercase mb-6 italic">Accesso Gestione</h2>
                                 <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
                                     <input type="password" placeholder="PASSWORD" class="p-5 border-2 rounded-[20px] font-bold text-center outline-none ${s.loginError ? 'border-red-500' : 'border-gray-200'}" oninput="window.state.passwordInput = this.value">
-                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black transition-colors">Entra</button>
+                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase">Entra</button>
                                 </form>
                             </div>
                         ` : `
                             <div class="max-w-4xl mx-auto">
                                 <div class="flex justify-between items-center mb-10 border-b-2 border-gray-100 pb-6">
-                                    <h2 class="text-4xl font-black uppercase italic">Crea Nuovo Articolo</h2>
-                                    <button onclick="updateState({isAdminAuthenticated: false, showAdmin: false})" class="bg-gray-100 text-[#001f3f] px-6 py-2 rounded-full font-black uppercase text-[10px] hover:bg-red-500 hover:text-white transition-all">LOGOUT</button>
+                                    <h2 class="text-4xl font-black uppercase italic">Nuovo Articolo</h2>
+                                    <span class="text-[9px] font-black uppercase px-3 py-1 rounded-full ${s.dbConnected ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}">
+                                        MODO: ${s.dbConnected ? 'CLOUD' : 'LOCALE'}
+                                    </span>
                                 </div>
-                                
                                 <form onsubmit="addNewProduct(event)" class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                                    <div class="flex flex-col gap-5">
-                                        <div>
-                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Nome Prodotto</label>
-                                            <input type="text" placeholder="Es. INTER HOME KIT 25/26" class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold uppercase outline-none" 
-                                                value="${s.newProduct.name}" oninput="window.state.newProduct.name = this.value">
-                                        </div>
-                                        <div class="grid grid-cols-2 gap-4">
-                                            <div>
-                                                <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Prezzo (€)</label>
-                                                <input type="number" placeholder="90" class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none" 
-                                                    value="${s.newProduct.price}" oninput="window.state.newProduct.price = this.value">
-                                            </div>
-                                            <div>
-                                                <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Macro Categoria</label>
-                                                <select class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-black uppercase text-xs outline-none cursor-pointer" 
-                                                    onchange="window.state.newProduct.macro = this.value; window.state.newProduct.sub = ''; render()">
-                                                    <option value="" ${!s.newProduct.macro ? 'selected' : ''}>SELEZIONA</option>
-                                                    <option value="calcio" ${s.newProduct.macro === 'calcio' ? 'selected' : ''}>CALCIO</option>
-                                                    <option value="brand" ${s.newProduct.macro === 'brand' ? 'selected' : ''}>BRAND</option>
-                                                </select>
-                                            </div>
-                                        </div>
-                                        <div>
-                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Sotto Categoria</label>
-                                            <select class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-black uppercase text-xs outline-none cursor-pointer" 
-                                                ${!s.newProduct.macro ? 'disabled' : ''} onchange="window.state.newProduct.sub = this.value; render()">
-                                                <option value="" ${!s.newProduct.sub ? 'selected' : ''}>${!s.newProduct.macro ? 'SCEGLI PRIMA MACRO' : 'SELEZIONA DETTAGLIO'}</option>
-                                                ${s.newProduct.macro ? CATEGORY_MAP[s.newProduct.macro].map(sub => `<option value="${sub}" ${s.newProduct.sub === sub ? 'selected' : ''}>${sub}</option>`).join('') : ''}
-                                            </select>
-                                        </div>
-                                        <div>
-                                            <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Descrizione</label>
-                                            <textarea placeholder="Dettagli sul prodotto..." class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none h-32" 
-                                                oninput="window.state.newProduct.desc = this.value">${s.newProduct.desc}</textarea>
-                                        </div>
+                                    <div class="flex flex-col gap-4">
+                                        <input type="text" placeholder="NOME PRODOTTO" class="p-5 bg-gray-50 border-2 border-gray-100 rounded-[20px] font-bold uppercase outline-none" value="${s.newProduct.name}" oninput="window.state.newProduct.name = this.value">
+                                        <input type="number" placeholder="PREZZO €" class="p-5 bg-gray-50 border-2 border-gray-100 rounded-[20px] font-bold outline-none" value="${s.newProduct.price}" oninput="window.state.newProduct.price = this.value">
+                                        <select class="p-5 bg-gray-50 border-2 border-gray-100 rounded-[20px] font-black uppercase text-xs outline-none cursor-pointer" onchange="window.state.newProduct.macro = this.value; window.state.newProduct.sub = ''; render()">
+                                            <option value="">MACRO CATEGORIA</option>
+                                            <option value="calcio" ${s.newProduct.macro === 'calcio' ? 'selected' : ''}>CALCIO</option>
+                                            <option value="brand" ${s.newProduct.macro === 'brand' ? 'selected' : ''}>BRAND</option>
+                                        </select>
+                                        <select class="p-5 bg-gray-50 border-2 border-gray-100 rounded-[20px] font-black uppercase text-xs outline-none cursor-pointer" ${!s.newProduct.macro ? 'disabled' : ''} onchange="window.state.newProduct.sub = this.value; render()">
+                                            <option value="">SOTTO CATEGORIA</option>
+                                            ${s.newProduct.macro ? CATEGORY_MAP[s.newProduct.macro].map(sub => `<option value="${sub}" ${s.newProduct.sub === sub ? 'selected' : ''}>${sub}</option>`).join('') : ''}
+                                        </select>
+                                        <textarea placeholder="DESCRIZIONE" class="p-5 bg-gray-50 border-2 border-gray-100 rounded-[20px] font-bold outline-none h-32" oninput="window.state.newProduct.desc = this.value">${s.newProduct.desc}</textarea>
                                     </div>
-
-                                    <div class="flex flex-col gap-5">
-                                        <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Immagini (URL)</label>
-                                        <div class="flex flex-col gap-3 max-h-[350px] overflow-y-auto pr-2 no-scrollbar">
-                                            ${s.newProduct.imgs.map((url, idx) => `
-                                                <div class="flex gap-2">
-                                                    <input type="text" placeholder="https://..." class="flex-1 p-4 bg-gray-50 border-2 border-gray-100 rounded-[20px] text-[10px] font-bold outline-none" 
-                                                        value="${url}" oninput="window.state.newProduct.imgs[${idx}] = this.value">
-                                                    <button type="button" onclick="window.state.newProduct.imgs.splice(${idx}, 1); render()" class="p-4 bg-red-50 text-red-500 rounded-[20px] hover:bg-red-500 hover:text-white transition-colors">
-                                                        <i data-lucide="trash-2" class="w-4 h-4"></i>
-                                                    </button>
-                                                </div>
-                                            `).join('')}
-                                        </div>
-                                        <button type="button" onclick="window.state.newProduct.imgs.push(''); render()" class="w-full py-4 border-2 border-dashed border-gray-200 rounded-[20px] font-black text-[10px] uppercase hover:bg-gray-50 transition-colors">
-                                            + Aggiungi Immagine
-                                        </button>
+                                    <div class="flex flex-col gap-4">
+                                        <label class="text-[10px] font-black uppercase opacity-40 ml-2">Immagini (URL)</label>
+                                        ${s.newProduct.imgs.map((url, idx) => `
+                                            <div class="flex gap-2">
+                                                <input type="text" placeholder="https://..." class="flex-1 p-4 bg-gray-50 border-2 border-gray-100 rounded-[15px] text-[10px] font-bold outline-none" value="${url}" oninput="window.state.newProduct.imgs[${idx}] = this.value">
+                                                <button type="button" onclick="window.state.newProduct.imgs.splice(${idx}, 1); render()" class="p-4 text-red-500"><i data-lucide="x" class="w-4 h-4"></i></button>
+                                            </div>
+                                        `).join('')}
+                                        <button type="button" onclick="window.state.newProduct.imgs.push(''); render()" class="text-[10px] font-black uppercase opacity-40">+ Agg. URL</button>
                                         <div class="mt-auto">
-                                            ${s.formError ? '<p class="text-red-500 text-[10px] font-black uppercase text-center mb-4">Compila tutti i campi!</p>' : ''}
-                                            <button type="submit" class="w-full bg-[#001f3f] text-white py-6 rounded-[30px] font-black uppercase text-xl shadow-xl hover:bg-black transition-all">Pubblica Articolo</button>
+                                            ${s.formError ? '<p class="text-red-500 text-[10px] font-black uppercase mb-2">Mancano dati obbligatori!</p>' : ''}
+                                            <button type="submit" ${s.isSaving ? 'disabled' : ''} class="w-full bg-[#001f3f] text-white py-6 rounded-[25px] font-black uppercase text-lg shadow-xl">
+                                                ${s.isSaving ? 'SALVATAGGIO...' : 'Salva Articolo'}
+                                            </button>
                                         </div>
                                     </div>
                                 </form>
@@ -289,22 +330,21 @@
             } else if (s.view === 'home') {
                 content += `
                     <div class="animate-fade-in">
-                        <div class="h-[500px] md:h-[650px] bg-[#001f3f] rounded-[50px] relative overflow-hidden flex items-end p-10 md:p-20 text-white shadow-2xl border-2 border-[#001f3f]">
-                             <div class="absolute inset-0 opacity-20 grayscale bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover"></div>
+                        <div class="h-[500px] md:h-[650px] bg-[#001f3f] rounded-[50px] relative overflow-hidden flex items-end p-10 md:p-20 text-white shadow-2xl">
+                             <div class="absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1534030347209-467a5b0ad3e6?w=1200')] bg-cover bg-center"></div>
                              <div class="relative z-10">
-                                <span class="bg-white text-[#001f3f] px-4 py-1 font-black text-xs uppercase rounded-full mb-6 inline-block tracking-widest">Stock Aggiornato</span>
-                                <h2 class="text-6xl md:text-[11rem] font-black uppercase italic leading-[0.85] tracking-tighter">ELITE<br>MEGASTORE</h2>
-                                <p class="mt-6 text-xs font-black uppercase tracking-[0.5em] opacity-50">+1000 ARTICOLI DISPONIBILI</p>
+                                <h2 class="text-7xl md:text-[11rem] font-black uppercase italic leading-[0.8] tracking-tighter">ELITE<br>APPAREL</h2>
+                                <p class="mt-6 text-xs font-black uppercase tracking-[0.5em] opacity-40">${s.items.length} PEZZI UNICI</p>
                              </div>
                         </div>
-                        <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
-                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group border-2 border-[#001f3f] p-16 rounded-[40px] bg-white hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-xl relative overflow-hidden">
-                                <h3 class="text-7xl md:text-8xl font-black italic uppercase relative z-10">KITS</h3>
-                                <p class="relative z-10 font-bold opacity-50">Maglie Gara, Allenamento e Retro</p>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-lg">
+                                <h3 class="text-6xl font-black italic uppercase">KITS</h3>
+                                <p class="font-bold opacity-50 uppercase text-xs mt-2">Calcio & Performance</p>
                             </div>
-                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group border-2 border-[#001f3f] p-16 rounded-[40px] bg-white hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-xl relative overflow-hidden">
-                                <h3 class="text-7xl md:text-8xl font-black italic uppercase relative z-10">BRANDS</h3>
-                                <p class="relative z-10 font-bold opacity-50">Streetwear di Lusso e Performance</p>
+                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-lg">
+                                <h3 class="text-6xl font-black italic uppercase">BRANDS</h3>
+                                <p class="font-bold opacity-50 uppercase text-xs mt-2">Streetwear di Lusso</p>
                             </div>
                         </div>
                     </div>
@@ -320,29 +360,27 @@
                     <div class="animate-fade-in">
                         <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
                             <div>
-                                <button onclick="updateState({view: 'home'})" class="text-[10px] font-black uppercase mb-4 flex items-center gap-2 bg-white px-4 py-2 rounded-full border border-gray-200"><i data-lucide="arrow-left" class="w-3 h-3"></i> Home</button>
-                                <h2 class="text-6xl md:text-9xl font-black uppercase italic tracking-tighter leading-none">${s.currentMacro}</h2>
+                                <button onclick="updateState({view: 'home'})" class="text-[10px] font-black uppercase mb-4 flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 hover:bg-white transition-all"><i data-lucide="chevron-left" class="w-3 h-3"></i> Home</button>
+                                <h2 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none">${s.currentMacro}</h2>
                             </div>
-                            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2 max-w-full md:max-w-2xl">
+                            <div class="flex gap-2 overflow-x-auto no-scrollbar pb-2">
                                 ${['all', ...CATEGORY_MAP[s.currentMacro]].map(sub => `
                                     <button onclick="updateState({currentSub: '${sub}'})" class="px-6 py-3 font-black uppercase text-[10px] border-2 border-[#001f3f] rounded-full whitespace-nowrap transition-all ${s.currentSub === sub ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-100'}">${sub}</button>
                                 `).join('')}
                             </div>
                         </div>
+                        
                         <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
-                            ${filtered.slice(0, 100).map(item => `
-                                <div class="group product-card" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
-                                    <div class="relative aspect-[4/5] rounded-[30px] overflow-hidden bg-gray-100 mb-4 border-2 border-transparent group-hover:border-[#001f3f] transition-all">
-                                        <img src="${item.imgs[0] || 'https://via.placeholder.com/400x500?text=No+Image'}" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700">
+                            ${filtered.map(item => `
+                                <div class="group cursor-pointer product-card" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
+                                    <div class="relative aspect-[4/5] rounded-[25px] overflow-hidden bg-white border-2 border-[#001f3f]/5 group-hover:border-[#001f3f] transition-all mb-4">
+                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover grayscale-0 group-hover:scale-105 transition-all duration-500">
                                         ${s.isAdminAuthenticated ? `
-                                            <div class="absolute top-4 right-4 flex flex-col gap-2 opacity-100 z-20">
-                                                <button onclick="event.stopPropagation(); updateState({items: window.state.items.filter(i => i.id !== '${item.id}')})" class="bg-white p-3 rounded-full shadow-lg hover:bg-red-500 hover:text-white transition-colors"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
-                                            </div>
+                                            <button onclick="event.stopPropagation(); deleteProduct('${item.id}')" class="absolute top-4 right-4 bg-white p-2 rounded-full shadow-md text-red-500 hover:bg-red-500 hover:text-white transition-all"><i data-lucide="trash-2" class="w-4 h-4"></i></button>
                                         ` : ''}
-                                        <div class="absolute bottom-4 left-4 bg-white/90 backdrop-blur px-3 py-1 font-black text-[8px] uppercase rounded-full">${item.sub}</div>
                                     </div>
-                                    <h3 class="text-sm font-black uppercase italic leading-tight px-1 h-10 overflow-hidden">${item.name}</h3>
-                                    <p class="text-xl font-black italic text-[#001f3f]/30 px-1 mt-1">€ ${item.price}</p>
+                                    <h3 class="text-[11px] font-black uppercase italic truncate mb-1">${item.name}</h3>
+                                    <p class="text-lg font-black italic text-[#001f3f]">€ ${item.price}</p>
                                 </div>
                             `).join('')}
                         </div>
@@ -354,24 +392,24 @@
                     <div class="animate-fade-in py-10">
                         <div class="flex flex-col lg:flex-row gap-16">
                             <div class="lg:w-3/5">
-                                <div class="aspect-square rounded-[60px] overflow-hidden border-2 border-gray-100 shadow-2xl bg-white relative group">
+                                <div class="aspect-square rounded-[50px] overflow-hidden border-2 border-[#001f3f]/5 bg-white relative">
                                     <img id="main-img" src="${p.imgs[0]}" class="w-full h-full object-cover">
-                                    <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-4">
+                                    <div class="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-3">
                                         ${p.imgs.map((img, idx) => `
-                                            <div onclick="document.getElementById('main-img').src = '${img}'" class="w-4 h-4 rounded-full bg-white border-2 border-[#001f3f] cursor-pointer hover:scale-125 transition-transform"></div>
+                                            <div onclick="document.getElementById('main-img').src = '${img}'" class="w-3 h-3 rounded-full bg-white border-2 border-[#001f3f] cursor-pointer"></div>
                                         `).join('')}
                                     </div>
                                 </div>
                             </div>
                             <div class="lg:w-2/5 flex flex-col justify-center">
-                                <span class="text-[#001f3f]/40 font-black text-xs uppercase tracking-widest mb-6">${p.macro} / ${p.sub}</span>
+                                <span class="text-[#001f3f]/30 font-black text-xs uppercase mb-6 tracking-widest">${p.macro} | ${p.sub}</span>
                                 <h2 class="text-6xl md:text-7xl font-black uppercase italic leading-[0.8] mb-8 tracking-tighter">${p.name}</h2>
                                 <p class="text-6xl font-black italic text-[#001f3f] mb-12 tracking-tighter">€ ${p.price}</p>
-                                <div class="bg-white p-10 border-2 border-[#001f3f] rounded-[40px] mb-10 shadow-lg relative">
-                                    <p class="text-xl font-bold italic text-gray-700 leading-relaxed">${p.desc || 'Capo esclusivo di alta qualità.'}</p>
+                                <div class="bg-white p-10 border-2 border-[#001f3f] rounded-[30px] mb-8">
+                                    <p class="text-lg font-bold italic text-gray-600 leading-relaxed">${p.desc || 'Qualità Elite garantita.'}</p>
                                 </div>
-                                <button class="bg-[#001f3f] text-white py-8 rounded-[30px] text-xl font-[1000] uppercase hover:bg-black transition-all shadow-xl">PRE-ORDINA ORA</button>
-                                <button onclick="updateState({view: 'category'})" class="mt-4 border-2 border-[#001f3f] text-[#001f3f] py-4 rounded-[30px] font-black uppercase text-xs hover:bg-gray-50 transition-all">Torna al Catalogo</button>
+                                <button class="bg-[#001f3f] text-white py-8 rounded-[25px] text-xl font-black uppercase hover:bg-black transition-all">ORDINA ORA (WHATSAPP)</button>
+                                <button onclick="updateState({view: 'category'})" class="mt-4 text-[#001f3f] py-4 font-black uppercase text-xs opacity-50 hover:opacity-100 transition-all">Chiudi Dettagli</button>
                             </div>
                         </div>
                     </div>
@@ -383,7 +421,10 @@
             lucide.createIcons();
         }
 
-        window.onload = () => render();
+        window.onload = () => {
+            setupFirebase();
+            render();
+        };
     </script>
 </body>
 </html>
