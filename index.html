@@ -56,7 +56,7 @@
     <div id="root">
         <div class="flex items-center justify-center h-screen flex-col">
             <div class="loader"></div>
-            <p class="mt-4 font-black uppercase text-xs tracking-widest">Inizializzazione Elite Store...</p>
+            <p class="mt-4 font-black uppercase text-xs tracking-widest">Verifica Connessione Cloud...</p>
         </div>
     </div>
 
@@ -65,34 +65,39 @@
         import { getAuth, signInAnonymously, signInWithCustomToken, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        // --- GESTIONE CONFIGURAZIONE AUTOMATICA ---
+        // --- GESTIONE CONFIGURAZIONE ---
         let firebaseConfig = null;
         try {
+            // Cerchiamo di leggere la configurazione iniettata dall'ambiente
             if (typeof __firebase_config !== 'undefined' && __firebase_config) {
-                firebaseConfig = JSON.parse(__firebase_config);
+                const parsed = JSON.parse(__firebase_config);
+                if (parsed && parsed.apiKey) {
+                    firebaseConfig = parsed;
+                }
             }
         } catch (e) {
-            console.warn("Configurazione Cloud non rilevata.");
+            console.error("Errore lettura config:", e);
         }
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'elite-demo';
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'elite-store-prod';
         
         let app, auth, db;
         let isCloudActive = false;
 
-        // Tenta di inizializzare Firebase solo se le chiavi esistono
-        if (firebaseConfig && firebaseConfig.apiKey) {
+        // Inizializzazione solo se abbiamo i dati necessari
+        if (firebaseConfig) {
             try {
                 app = initializeApp(firebaseConfig);
                 auth = getAuth(app);
                 db = getFirestore(app);
                 isCloudActive = true;
             } catch (e) {
-                console.error("Errore inizializzazione:", e);
+                console.error("Firebase Init Error:", e);
+                isCloudActive = false;
             }
         }
 
-        // --- STATO DELL'APPLICAZIONE ---
+        // --- STATO ---
         window.state = {
             items: [],
             view: 'home',
@@ -112,9 +117,9 @@
             'brand': ['Nike', 'Adidas', 'Ralph Lauren', 'Stone Island', 'Lacoste']
         };
 
-        const ADMIN_PASSWORD = "ELITE2025";
+        const ADMIN_PASSWORD = "15m09c20@"; // Password sincronizzata
 
-        // --- LOGICA DI AGGIORNAMENTO ---
+        // --- UTILS ---
         window.showToast = (msg) => {
             const t = document.getElementById('toast');
             if(t) {
@@ -157,15 +162,14 @@
                 try {
                     const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
                     await addDoc(dataCol, newItem);
-                    window.showToast("Prodotto Salvato nel Cloud");
+                    window.showToast("Salvato nel Cloud");
                 } catch (err) {
-                    window.showToast("Errore di connessione");
+                    window.showToast("Errore Cloud - Prova a ricaricare");
                 }
             } else {
-                // Fallback locale per la demo
                 const demoItems = [...s.items, { ...newItem, id: Date.now().toString() }];
                 window.updateState({ items: demoItems });
-                window.showToast("Salvato in locale (Modalità Demo)");
+                window.showToast("Salvato in Locale (DEMO)");
             }
 
             window.updateState({ 
@@ -175,21 +179,21 @@
         };
 
         window.handleDelete = async (id) => {
-            if (confirm("Eliminare definitivamente questo prodotto?")) {
-                if (isCloudActive) {
-                    try {
-                        await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
-                        window.showToast("Eliminato dal Cloud");
-                    } catch (err) { window.showToast("Errore eliminazione"); }
-                } else {
-                    const filtered = window.state.items.filter(i => i.id !== id);
-                    window.updateState({ items: filtered });
-                    window.showToast("Eliminato localmente");
-                }
+            if (!confirm("Eliminare il prodotto?")) return;
+            
+            if (isCloudActive) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                    window.showToast("Rimosso dal Cloud");
+                } catch (err) { window.showToast("Errore eliminazione"); }
+            } else {
+                const filtered = window.state.items.filter(i => i.id !== id);
+                window.updateState({ items: filtered });
+                window.showToast("Rimosso localmente");
             }
         };
 
-        // --- INTERFACCIA ---
+        // --- RENDER ---
         function render() {
             const root = document.getElementById('root');
             if(!root) return;
@@ -201,9 +205,9 @@
                         ELITE APPAREL
                     </h1>
                     <div class="flex items-center gap-4">
-                        <div class="hidden md:flex flex-col items-end mr-2">
-                            <span class="text-[8px] font-black uppercase tracking-widest ${s.isCloud ? 'text-green-500' : 'text-red-500'}">
-                                ${s.isCloud ? 'Cloud Online' : 'Cloud Offline (Demo)'}
+                        <div class="flex flex-col items-end mr-2">
+                            <span class="text-[9px] font-black uppercase tracking-widest ${s.isCloud ? 'text-green-500' : 'text-red-400'}">
+                                ${s.isCloud ? '● Cloud Online' : '○ Modalità Demo'}
                             </span>
                         </div>
                         <button onclick="updateState({showAdmin: !window.state.showAdmin})" 
@@ -222,22 +226,21 @@
                     <div class="mt-6 p-8 bg-gray-50 border-2 border-[#001f3f] rounded-[40px] animate-fade-in shadow-xl">
                         ${!s.isAdminAuthenticated ? `
                             <div class="max-w-md mx-auto text-center py-10">
-                                <h2 class="text-3xl font-black uppercase mb-6 italic">Accesso Amministratore</h2>
+                                <h2 class="text-3xl font-black uppercase mb-6 italic">Pannello Admin</h2>
                                 <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
                                     <input type="password" placeholder="PASSWORD" class="p-5 border-2 rounded-[20px] font-bold text-center outline-none ${s.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#001f3f]'}" oninput="window.state.passwordInput = this.value">
-                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black transition-all">Sblocca</button>
+                                    <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black">Entra</button>
                                 </form>
-                                <p class="mt-4 text-[10px] font-bold opacity-30">SUGGERIMENTO: ELITE2025</p>
                             </div>
                         ` : `
-                            <div class="flex justify-between items-center mb-8">
-                                <h2 class="text-3xl font-black uppercase italic tracking-tighter">Pannello Prodotti</h2>
-                                <button onclick="updateState({isAdminAuthenticated: false})" class="text-red-500 font-black text-[10px] uppercase">Logout</button>
+                            <div class="flex justify-between items-center mb-8 border-b-2 border-gray-100 pb-6">
+                                <h2 class="text-3xl font-black uppercase italic tracking-tighter">Nuovo Prodotto</h2>
+                                <button onclick="updateState({isAdminAuthenticated: false})" class="text-red-500 font-black text-[10px] uppercase bg-white px-4 py-2 rounded-full border border-red-200 hover:bg-red-50">Logout</button>
                             </div>
                             <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                 <div class="flex flex-col gap-4">
-                                    <input placeholder="NOME PRODOTTO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.name = this.value" required>
-                                    <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.price = this.value" required>
+                                    <input placeholder="NOME ARTICOLO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.name = this.value" required>
+                                    <input placeholder="PREZZO (€)" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.price = this.value" required>
                                     <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="window.state.formData.macro = this.value; render()" required>
                                         <option value="">CATEGORIA</option>
                                         <option value="calcio">CALCIO</option>
@@ -249,9 +252,9 @@
                                     </select>
                                 </div>
                                 <div class="bg-white p-6 rounded-[30px] border-2 border-gray-100 flex flex-col gap-4">
-                                    <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="window.state.formData.desc = this.value" required></textarea>
+                                    <textarea placeholder="DESCRIZIONE DETTAGLIATA" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.desc = this.value" required></textarea>
                                     <input placeholder="LINK IMMAGINE (URL)" class="p-5 border-2 rounded-[20px] font-bold outline-none focus:border-[#001f3f]" oninput="window.state.formData.imgs[0] = this.value" required>
-                                    <button type="submit" class="bg-[#001f3f] text-white p-6 font-black uppercase rounded-[20px] hover:bg-black transition-all">Aggiungi Prodotto</button>
+                                    <button type="submit" class="bg-[#001f3f] text-white p-6 font-black uppercase rounded-[20px] hover:bg-black transition-all shadow-lg">Aggiungi al Catalogo</button>
                                 </div>
                             </form>
                         `}
@@ -262,23 +265,21 @@
             if (s.view === 'home') {
                 content += `
                     <div class="py-8 animate-fade-in">
-                        <div class="relative h-[500px] md:h-[650px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[60px] border-[2px] border-[#001f3f]">
-                            <div class="absolute inset-0 grayscale opacity-20 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover bg-center"></div>
+                        <div class="relative h-[450px] md:h-[600px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[50px] border-[2px] border-[#001f3f]">
+                            <div class="absolute inset-0 grayscale opacity-10 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover bg-center"></div>
                             <div class="z-10 w-full text-white">
-                                <h2 class="text-7xl md:text-[12rem] font-black leading-[0.75] uppercase tracking-[-0.09em] mb-8">ELITE<br>ERA</h2>
-                                <div class="flex gap-4">
-                                    <span class="bg-white text-[#001f3f] px-8 py-3 rounded-full text-xs font-black uppercase italic">Drop 2026</span>
-                                </div>
+                                <h2 class="text-6xl md:text-[10rem] font-black leading-[0.8] uppercase tracking-[-0.08em] mb-4">COLLECTION<br>ARCHIVE</h2>
+                                <p class="text-xs font-black uppercase tracking-[0.4em] opacity-40">Elite Apparel Store — 2025</p>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group relative overflow-hidden cursor-pointer border-[2px] border-[#001f3f] p-16 rounded-[50px] bg-white transition-all hover:bg-[#001f3f] hover:text-white">
-                                <h3 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-2 transition-transform">KIT</h3>
-                                <p class="text-sm font-black uppercase mt-4 opacity-40">Maglie Calcio</p>
+                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group border-[2px] border-[#001f3f] p-12 rounded-[40px] bg-white transition-all hover:bg-[#001f3f] hover:text-white cursor-pointer">
+                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-1 transition-transform">KIT</h3>
+                                <p class="text-[10px] font-black uppercase mt-4 opacity-40 tracking-widest">Jersey Calcio</p>
                             </div>
-                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group relative overflow-hidden cursor-pointer border-[2px] border-[#001f3f] p-16 rounded-[50px] bg-white transition-all hover:bg-[#001f3f] hover:text-white">
-                                <h3 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-2 transition-transform">BRAND</h3>
-                                <p class="text-sm font-black uppercase mt-4 opacity-40">Streetwear</p>
+                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group border-[2px] border-[#001f3f] p-12 rounded-[40px] bg-white transition-all hover:bg-[#001f3f] hover:text-white cursor-pointer">
+                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none group-hover:-translate-y-1 transition-transform">BRAND</h3>
+                                <p class="text-[10px] font-black uppercase mt-4 opacity-40 tracking-widest">Streetwear Luxury</p>
                             </div>
                         </div>
                     </div>
@@ -287,34 +288,31 @@
                 const filtered = s.items.filter(i => i.macro === s.currentMacro && (s.currentSub === 'all' || i.sub === s.currentSub));
                 content += `
                     <div class="py-8 animate-fade-in">
-                        <div class="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
-                            <div>
-                                <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-8 flex items-center gap-2 bg-gray-100 px-6 py-3 rounded-full w-fit hover:bg-black hover:text-white transition-all">
-                                    <i data-lucide="chevron-left" class="w-4 h-4"></i> HOME
-                                </button>
-                                <h2 class="text-6xl md:text-[10rem] font-black uppercase tracking-tighter leading-none">${s.currentMacro}</h2>
-                            </div>
+                        <div class="mb-10">
+                            <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-6 flex items-center gap-2 bg-gray-50 px-6 py-2 rounded-full w-fit hover:bg-black hover:text-white">
+                                <i data-lucide="home" class="w-4 h-4"></i> HOME
+                            </button>
+                            <h2 class="text-5xl md:text-[8rem] font-black uppercase tracking-tighter leading-none">${s.currentMacro}</h2>
                         </div>
-                        <div class="flex flex-wrap gap-3 mb-16 overflow-x-auto pb-4 no-scrollbar">
+                        <div class="flex flex-wrap gap-2 mb-12">
                             ${['all', ...CATEGORY_MAP[s.currentMacro]].map(sub => `
-                                <button onclick="updateState({currentSub: '${sub}'})" class="px-10 py-4 font-black uppercase text-[11px] tracking-widest border-2 border-[#001f3f] rounded-full transition-all ${s.currentSub === sub ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-100'}">
+                                <button onclick="updateState({currentSub: '${sub}'})" class="px-8 py-3 font-black uppercase text-[10px] tracking-widest border-2 border-[#001f3f] rounded-full ${s.currentSub === sub ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-50'}">
                                     ${sub}
                                 </button>
                             `).join('')}
                         </div>
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-12">
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-8">
                             ${filtered.map(item => `
-                                <div class="group relative cursor-pointer img-zoom" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
-                                    ${s.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-6 right-6 z-20 bg-red-500 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-5 h-5"></i></button>` : ''}
-                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[45px] mb-6 relative bg-gray-50">
-                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover transition-transform duration-700" onerror="this.src='https://via.placeholder.com/400x600?text=Immagine+Non+Valida'">
-                                        <div class="absolute bottom-6 left-6 bg-[#001f3f] text-white px-5 py-2 font-black text-[10px] uppercase rounded-full">${item.sub}</div>
+                                <div class="group relative cursor-pointer" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
+                                    ${s.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-4 right-4 z-20 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[30px] mb-4 relative bg-gray-50">
+                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" onerror="this.src='https://via.placeholder.com/400x600?text=Immagine+Non+Valida'">
+                                        <div class="absolute top-4 left-4 bg-white/90 px-3 py-1 font-black text-[8px] uppercase rounded-full shadow-sm">${item.sub}</div>
                                     </div>
-                                    <h3 class="text-3xl font-black uppercase tracking-tighter mb-1 leading-none">${item.name}</h3>
-                                    <p class="text-xl font-black italic text-[#001f3f]/30">€ ${item.price}</p>
+                                    <h3 class="text-xl font-black uppercase tracking-tighter leading-tight">${item.name}</h3>
+                                    <p class="text-lg font-black italic text-[#001f3f]/40">€ ${item.price}</p>
                                 </div>
                             `).join('')}
-                            ${filtered.length === 0 ? '<div class="col-span-full py-20 text-center opacity-20 font-black uppercase">Nessun prodotto trovato</div>' : ''}
                         </div>
                     </div>
                 `;
@@ -322,23 +320,23 @@
                 const p = s.selectedProduct;
                 content += `
                     <div class="py-12 animate-fade-in">
-                        <button onclick="updateState({view: 'category'})" class="mb-12 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-8 py-4 rounded-full border-2 border-gray-100 hover:bg-black hover:text-white transition-all">
-                            <i data-lucide="arrow-left" class="w-4 h-4"></i> TORNA ALLA LISTA
+                        <button onclick="updateState({view: 'category'})" class="mb-10 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-6 py-3 rounded-full border border-gray-200">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i> GALLERY
                         </button>
-                        <div class="flex flex-col lg:flex-row gap-20">
+                        <div class="flex flex-col lg:flex-row gap-16">
                             <div class="w-full lg:w-3/5">
-                                <div class="aspect-square border-2 border-gray-100 overflow-hidden rounded-[60px] bg-gray-50">
+                                <div class="aspect-square border-2 border-gray-100 overflow-hidden rounded-[50px] bg-gray-50">
                                     <img src="${p.imgs[0]}" class="w-full h-full object-cover" onerror="this.src='https://via.placeholder.com/800x800?text=Anteprima+Non+Disponibile'">
                                 </div>
                             </div>
                             <div class="w-full lg:w-2/5 flex flex-col justify-center">
-                                <span class="text-[#001f3f]/30 font-black text-sm uppercase mb-6 tracking-widest">${p.sub}</span>
-                                <h2 class="text-7xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8] mb-10">${p.name}</h2>
-                                <p class="text-7xl font-black italic text-[#001f3f] mb-14 tracking-tighter">€ ${p.price}</p>
-                                <div class="bg-gray-50 p-12 border-l-[15px] border-[#001f3f] rounded-[40px] mb-12">
-                                    <p class="text-2xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
+                                <span class="text-gray-300 font-black text-xs uppercase mb-4 tracking-[0.3em]">${p.sub}</span>
+                                <h2 class="text-6xl md:text-7xl font-black uppercase tracking-tighter leading-[0.8] mb-8">${p.name}</h2>
+                                <p class="text-6xl font-black italic text-[#001f3f] mb-10 tracking-tighter">€ ${p.price}</p>
+                                <div class="bg-gray-50 p-10 border-l-[10px] border-[#001f3f] rounded-[30px] mb-10">
+                                    <p class="text-xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
                                 </div>
-                                <button class="w-full bg-[#001f3f] text-white py-12 text-3xl font-black uppercase rounded-[40px] hover:bg-black transition-all shadow-xl">ORDINA ORA</button>
+                                <button class="w-full bg-[#001f3f] text-white py-10 text-2xl font-black uppercase rounded-[30px] hover:bg-black transition-all shadow-xl active:scale-95">ACQUISTA ORA</button>
                             </div>
                         </div>
                     </div>
@@ -350,17 +348,18 @@
             lucide.createIcons();
         }
 
-        // --- INIZIO APP ---
+        // --- INIZIO ---
         const init = async () => {
             if (isCloudActive) {
                 try {
-                    // Autenticazione silente
+                    // 1. Auth prioritario
                     if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
                         await signInWithCustomToken(auth, __initial_auth_token);
                     } else {
                         await signInAnonymously(auth);
                     }
 
+                    // 2. Listener dati
                     onAuthStateChanged(auth, (user) => {
                         if (user) {
                             const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
@@ -368,11 +367,15 @@
                                 const items = [];
                                 snap.forEach(doc => items.push({ id: doc.id, ...doc.data() }));
                                 window.updateState({ items });
-                            }, (err) => console.error("Firestore Error:", err));
+                            }, (err) => {
+                                console.error("Firestore Error:", err);
+                                useDemoData();
+                            });
                         }
                     });
                 } catch (e) {
                     console.error("Auth Fail:", e);
+                    window.updateState({ isCloud: false });
                     useDemoData();
                 }
             } else {
