@@ -55,59 +55,44 @@
     <div id="root"></div>
 
     <script type="module">
-        // --- GENERATORE DI CATALOGO INIZIALE ---
-        const generateInitialCatalog = () => {
+        // --- GENERATORE MASSIVO DI CATALOGO (1000+ Articoli) ---
+        const generateMassiveCatalog = () => {
             const catalog = [];
-            const teams = [{ name: 'Inter', color: 'Nerazzurra' }, { name: 'Juve', color: 'Bianconera' }, { name: 'Milan', color: 'Rossonera' }];
-            const brands = ['Stone Island', 'Nike Tech', 'CP Company'];
-            
-            let idCount = 1;
-            // Genera una base di prodotti
-            teams.forEach(t => {
-                catalog.push({
-                    id: `seed-${idCount++}`,
-                    name: `${t.name} Home Kit 25/26`,
-                    price: "95",
-                    macro: 'calcio',
-                    sub: t.name,
-                    desc: `Anteprima maglia home ${t.color}.`,
-                    imgs: [`https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=800&sig=${idCount}`]
-                });
-            });
-            brands.forEach(b => {
-                catalog.push({
-                    id: `seed-${idCount++}`,
-                    name: `${b} Hoodie Special`,
-                    price: "150",
-                    macro: 'brand',
-                    sub: b,
-                    desc: `Capo esclusivo collezione ${b}.`,
-                    imgs: [`https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&sig=${idCount}`]
-                });
-            });
-            return catalog;
-        };
+            const teams = ['Milan', 'Inter', 'Juve', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Liverpool', 'PSG', 'Bayern', 'Italia', 'Brasile'];
+            const types = ['Home Kit', 'Away Kit', 'Third Kit', 'Training Jersey', 'Retro Classic'];
+            const brands = ['Stone Island', 'Nike Tech', 'CP Company', 'Ralph Lauren', 'Lacoste', 'Stussy'];
+            const clothes = ['Hoodie', 'Cargo', 'T-Shirt', 'Jacket', 'Zip Hoodie'];
 
-        window.state = {
-            items: generateInitialCatalog(),
-            view: 'home',
-            currentMacro: null,
-            currentSub: 'all',
-            searchTerm: '',
-            selectedProduct: null,
-            showAdmin: false,
-            isAdminAuthenticated: false,
-            passwordInput: '',
-            loginError: false,
-            // Form per nuovo prodotto
-            newProduct: {
-                name: '',
-                price: '',
-                macro: '',
-                sub: '',
-                desc: '',
-                imgs: ['']
+            // 500+ KIT CALCIO
+            for (let i = 1; i <= 510; i++) {
+                const team = teams[Math.floor(Math.random() * teams.length)];
+                const type = types[Math.floor(Math.random() * types.length)];
+                catalog.push({
+                    id: `kit-${i}`,
+                    name: `${team} ${type} 25/26`.toUpperCase(),
+                    price: (Math.random() * (120 - 75) + 75).toFixed(0),
+                    macro: 'calcio',
+                    sub: team,
+                    desc: `Maglia ufficiale ${team} versione ${type}. Alta qualità.`,
+                    imgs: [`https://images.unsplash.com/photo-1517466787929-bc90951d0974?w=800&sig=${i}`]
+                });
             }
+
+            // 500+ BRAND STREETWEAR
+            for (let i = 1; i <= 510; i++) {
+                const brand = brands[Math.floor(Math.random() * brands.length)];
+                const itemType = clothes[Math.floor(Math.random() * clothes.length)];
+                catalog.push({
+                    id: `brand-${i}`,
+                    name: `${brand} ${itemType} Collection`.toUpperCase(),
+                    price: (Math.random() * (200 - 50) + 50).toFixed(0),
+                    macro: 'brand',
+                    sub: brand,
+                    desc: `Capo esclusivo della collezione ${brand}. Design premium.`,
+                    imgs: [`https://images.unsplash.com/photo-1591047139829-d91aecb6caea?w=800&sig=${i + 500}`]
+                });
+            }
+            return catalog;
         };
         const firebaseConfig = {
   apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
@@ -119,11 +104,32 @@
   measurementId: "G-4JBL54XKNN"
 };
         const CATEGORY_MAP = {
-            'calcio': ['Inter', 'Juve', 'Milan', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Nazionali'],
-            'brand': ['Stone Island', 'Ralph Lauren', 'Lacoste', 'Nike Tech', 'CP Company', 'Adidas Originals']
+            'calcio': ['Inter', 'Juve', 'Milan', 'Roma', 'Napoli', 'Real Madrid', 'Barça', 'Man City', 'Nazionali', 'Liverpool', 'PSG', 'Bayern', 'Italia', 'Brasile'],
+            'brand': ['Stone Island', 'Ralph Lauren', 'Lacoste', 'Nike Tech', 'CP Company', 'Adidas Originals', 'Stussy']
         };
 
         const ADMIN_PASSWORD = "15m09c20@";
+
+        window.state = {
+            items: generateMassiveCatalog(),
+            view: 'home',
+            currentMacro: null,
+            currentSub: 'all',
+            searchTerm: '',
+            selectedProduct: null,
+            showAdmin: false,
+            isAdminAuthenticated: false,
+            passwordInput: '',
+            loginError: false,
+            newProduct: {
+                name: '',
+                price: '',
+                macro: '',
+                sub: '',
+                desc: '',
+                imgs: ['']
+            }
+        };
 
         window.updateState = (newState) => {
             window.state = { ...window.state, ...newState };
@@ -148,13 +154,22 @@
         window.addNewProduct = (e) => {
             e.preventDefault();
             const p = window.state.newProduct;
-            if (!p.name || !p.price || !p.macro || !p.sub) return;
+            
+            if (!p.name || !p.price || !p.macro || !p.sub) {
+                console.error("Campi mancanti");
+                return;
+            }
 
             const newItem = {
                 ...p,
                 id: `manual-${Date.now()}`,
+                name: p.name.toUpperCase(),
                 imgs: p.imgs.filter(url => url.trim() !== '')
             };
+
+            if (newItem.imgs.length === 0) {
+                newItem.imgs = ['https://via.placeholder.com/800?text=No+Image'];
+            }
 
             window.updateState({
                 items: [newItem, ...window.state.items],
@@ -202,7 +217,7 @@
                         ` : `
                             <div class="max-w-4xl mx-auto">
                                 <div class="flex justify-between items-center mb-10 border-b-2 border-gray-100 pb-6">
-                                    <h2 class="text-4xl font-black uppercase italic italic">Crea Nuovo Articolo</h2>
+                                    <h2 class="text-4xl font-black uppercase italic">Crea Nuovo Articolo</h2>
                                     <button onclick="updateState({isAdminAuthenticated: false, showAdmin: false})" class="bg-gray-100 text-[#001f3f] px-6 py-2 rounded-full font-black uppercase text-[10px] hover:bg-red-500 hover:text-white transition-all">LOGOUT</button>
                                 </div>
                                 
@@ -232,14 +247,14 @@
                                         <div>
                                             <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Sotto Categoria</label>
                                             <select required class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-black uppercase text-xs outline-none cursor-pointer" 
-                                                ${!s.newProduct.macro ? 'disabled' : ''} onchange="window.state.newProduct.sub = this.value">
+                                                ${!s.newProduct.macro ? 'disabled' : ''} onchange="window.state.newProduct.sub = this.value; render()">
                                                 <option value="">SELEZIONA</option>
                                                 ${s.newProduct.macro ? CATEGORY_MAP[s.newProduct.macro].map(sub => `<option value="${sub}" ${s.newProduct.sub === sub ? 'selected' : ''}>${sub}</option>`).join('') : ''}
                                             </select>
                                         </div>
                                         <div>
                                             <label class="text-[10px] font-black uppercase opacity-40 ml-4 mb-2 block">Descrizione</label>
-                                            <textarea placeholder="Dettagli sul tessuto, vestibilità..." class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none h-32" 
+                                            <textarea placeholder="Dettagli sul prodotto..." class="w-full p-5 bg-gray-50 border-2 border-gray-100 rounded-[25px] font-bold outline-none h-32" 
                                                 oninput="window.state.newProduct.desc = this.value">${s.newProduct.desc}</textarea>
                                         </div>
                                     </div>
@@ -275,9 +290,9 @@
                         <div class="h-[500px] md:h-[650px] bg-[#001f3f] rounded-[50px] relative overflow-hidden flex items-end p-10 md:p-20 text-white shadow-2xl border-2 border-[#001f3f]">
                              <div class="absolute inset-0 opacity-20 grayscale bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover"></div>
                              <div class="relative z-10">
-                                <span class="bg-white text-[#001f3f] px-4 py-1 font-black text-xs uppercase rounded-full mb-6 inline-block tracking-widest">Saison 25/26 Preview</span>
+                                <span class="bg-white text-[#001f3f] px-4 py-1 font-black text-xs uppercase rounded-full mb-6 inline-block tracking-widest">Stock Aggiornato</span>
                                 <h2 class="text-6xl md:text-[11rem] font-black uppercase italic leading-[0.85] tracking-tighter">ELITE<br>MEGASTORE</h2>
-                                <p class="mt-6 text-xs font-black uppercase tracking-[0.5em] opacity-50">+500 ARTICOLI DISPONIBILI</p>
+                                <p class="mt-6 text-xs font-black uppercase tracking-[0.5em] opacity-50">+1000 ARTICOLI DISPONIBILI</p>
                              </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-10 mt-10">
@@ -314,7 +329,7 @@
                         </div>
                         <p class="mb-8 font-black uppercase text-[10px] opacity-40">Articoli in questa categoria: ${filtered.length}</p>
                         <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
-                            ${filtered.map(item => `
+                            ${filtered.slice(0, 100).map(item => `
                                 <div class="group product-card" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
                                     <div class="relative aspect-[4/5] rounded-[30px] overflow-hidden bg-gray-100 mb-4 border-2 border-transparent group-hover:border-[#001f3f] transition-all">
                                         <img src="${item.imgs[0] || 'https://via.placeholder.com/400x500?text=No+Image'}" class="w-full h-full object-cover grayscale group-hover:grayscale-0 transition-all duration-700">
@@ -330,6 +345,7 @@
                                 </div>
                             `).join('')}
                         </div>
+                        ${filtered.length > 100 ? `<p class="mt-10 text-center font-black uppercase opacity-20 text-xs">...e altri ${filtered.length - 100} articoli disponibili</p>` : ''}
                     </div>
                 `;
             } else if (s.view === 'detail' && s.selectedProduct) {
@@ -352,7 +368,7 @@
                                 <h2 class="text-6xl md:text-7xl font-black uppercase italic leading-[0.8] mb-8 tracking-tighter">${p.name}</h2>
                                 <p class="text-6xl font-black italic text-[#001f3f] mb-12 tracking-tighter">€ ${p.price}</p>
                                 <div class="bg-white p-10 border-2 border-[#001f3f] rounded-[40px] mb-10 shadow-lg relative">
-                                    <p class="text-xl font-bold italic text-gray-700 leading-relaxed">${p.desc || 'Nessuna descrizione disponibile per questo prodotto esclusivo.'}</p>
+                                    <p class="text-xl font-bold italic text-gray-700 leading-relaxed">${p.desc || 'Nessuna descrizione disponibile per questo prodotto.'}</p>
                                 </div>
                                 <button class="bg-[#001f3f] text-white py-8 rounded-[30px] text-xl font-[1000] uppercase hover:bg-black transition-all shadow-xl">PRE-ORDINA ORA</button>
                                 <button onclick="updateState({view: 'category'})" class="mt-4 border-2 border-[#001f3f] text-[#001f3f] py-4 rounded-[30px] font-black uppercase text-xs hover:bg-gray-50 transition-all">Torna al Catalogo</button>
