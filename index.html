@@ -3,233 +3,314 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>STORE</title>
+    <title>Elite Apparel Store</title>
+    <!-- Tailwind CSS per lo stile moderno -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <!-- Lucide Icons per le icone -->
+    <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        
         body {
             font-family: 'Inter', sans-serif;
-            background-color: #ffffff;
+            background-color: white;
             color: #001f3f;
-            overflow-x: hidden;
+            margin: 0;
         }
-        .custom-scrollbar::-webkit-scrollbar { width: 6px; }
-        .custom-scrollbar::-webkit-scrollbar-track { background: #f1f1f1; border-radius: 10px; }
-        .custom-scrollbar::-webkit-scrollbar-thumb { background: #001f3f; border-radius: 10px; }
-        @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
-        @keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
-        .animate-fade-in { animation: fadeIn 0.3s ease-out forwards; }
-        .animate-slide-up { animation: slideUp 0.3s ease-out forwards; }
+
+        .font-heavy { font-weight: 1000; }
+        
+        .animate-fade-in {
+            animation: fadeIn 0.5s ease-out forwards;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+        ::selection {
+            background: #001f3f;
+            color: white;
+        }
     </style>
 </head>
-<body>
+<body class="pb-20">
+
     <div id="root"></div>
 
-    <script type="text/babel">
-        const { useState, useEffect } = React;
-
-        // Componenti Icone SVG Inline per evitare dipendenze esterne instabili
-        const Icons = {
-            Lock: () => (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
-            ),
-            Settings: () => (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1V11a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0 .33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-            ),
-            Trash: () => (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"></polyline><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>
-            ),
-            Plus: () => (
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"><line x1="12" y1="5" x2="12" y2="19"></line><line x1="5" y1="12" x2="19" y2="12"></line></svg>
-            ),
-            ChevronLeft: () => (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="15 18 9 12 15 6"></polyline></svg>
-            ),
-            Search: () => (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line></svg>
-            )
-        };
-
+    <script>
+        // --- CONFIGURAZIONE ---
         const CATEGORY_MAP = {
             'calcio': ['Serie A', 'Premier League', 'La Liga', 'Ligue 1', 'Champions League', 'Nazionali'],
             'brand': ['Nike', 'Adidas', 'Ralph Lauren', 'Stone Island', 'Lacoste']
         };
 
         const ADMIN_PASSWORD = "15m09c20@";
+        const STORAGE_KEY = 'elite_apparel_data';
 
-        function App() {
-            const [items, setItems] = useState([
-                { id: '1', name: 'JERSEY MILAN HOME 24/25', price: '89.99', macro: 'calcio', sub: 'Serie A', desc: 'Design iconico.', imgs: ['https://images.unsplash.com/photo-1624365160322-835692631566?w=800'] },
-                { id: '2', name: 'NIKE TECH FLEECE', price: '119.00', macro: 'brand', sub: 'Nike', desc: 'Comfort urbano.', imgs: ['https://images.unsplash.com/photo-1556821840-3a63f95609a7?w=800'] }
-            ]);
+        // --- DATI INIZIALI (Se il database locale è vuoto) ---
+        const INITIAL_ITEMS = [
+            {
+                id: '1',
+                name: 'JERSEY MILAN HOME 24/25',
+                price: '89.99',
+                macro: 'calcio',
+                sub: 'Serie A',
+                desc: 'La nuova maglia home del Milan per la stagione 2024/2025. Design iconico a strisce rossonere.',
+                imgs: ['https://images.unsplash.com/photo-1624365160322-835692631566?w=800']
+            }
+        ];
 
-            const [view, setView] = useState('home');
-            const [currentMacro, setCurrentMacro] = useState(null);
-            const [currentSub, setCurrentSub] = useState('all');
-            const [selectedProduct, setSelectedProduct] = useState(null);
-            const [showAdmin, setShowAdmin] = useState(false);
-            const [isAdminAuth, setIsAdminAuth] = useState(false);
-            const [passInput, setPassInput] = useState('');
-            const [error, setError] = useState(false);
-            const [searchTerm, setSearchTerm] = useState('');
-            const [imgIndex, setImgIndex] = useState(0);
+        // --- STATO DELL'APP ---
+        let state = {
+            items: [], // Verrà popolato dal LocalStorage
+            view: 'home',
+            currentMacro: null,
+            currentSub: 'all',
+            selectedProduct: null,
+            showAdmin: false,
+            isAdminAuthenticated: false,
+            passwordInput: '',
+            loginError: false,
+            searchTerm: '',
+            formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] }
+        };
 
-            const [form, setForm] = useState({ name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] });
-
-            const handleLogin = (e) => {
-                e.preventDefault();
-                if (passInput === ADMIN_PASSWORD) {
-                    setIsAdminAuth(true);
-                    setError(false);
-                    setPassInput('');
-                } else {
-                    setError(true);
-                }
-            };
-
-            const addProduct = (e) => {
-                e.preventDefault();
-                const newP = { ...form, id: Date.now().toString(), name: form.name.toUpperCase(), imgs: form.imgs.filter(i => i.trim() !== '') };
-                setItems([...items, newP]);
-                setForm({ name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] });
-            };
-
-            const filtered = items.filter(i => {
-                if (!currentMacro) return false;
-                return i.macro === currentMacro && (currentSub === 'all' || i.sub === currentSub) && i.name.toLowerCase().includes(searchTerm.toLowerCase());
-            });
-
-            return (
-                <div className="min-h-screen pb-20 select-none">
-                    <header className="mt-4 mx-4 md:mx-10 p-6 flex justify-between items-center border-[2px] border-[#001f3f] rounded-[25px] bg-white sticky top-4 z-50">
-                        <h1 onClick={() => { setView('home'); setShowAdmin(false); }} className="text-2xl md:text-4xl font-[900] tracking-tighter cursor-pointer uppercase"></h1>
-                        <button onClick={() => setShowAdmin(!showAdmin)} className={`p-3 px-6 rounded-full font-black text-[10px] flex items-center gap-2 transition-all ${showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white'}`}>
-                            {isAdminAuth ? <Icons.Settings /> : <Icons.Lock />}
-                            {showAdmin ? 'CHIUDI' : 'ADMIN'}
-                        </button>
-                    </header>
-
-                    <main className="max-w-[1400px] mx-auto px-6 mt-8">
-                        {showAdmin && (
-                            <div className="animate-slide-up mb-10">
-                                {!isAdminAuth ? (
-                                    <div className="bg-gray-50 p-10 rounded-[30px] border-[2px] border-[#001f3f] max-w-md mx-auto text-center">
-                                        <h2 className="text-2xl font-black mb-6 uppercase">Accesso Protetto</h2>
-                                        <form onSubmit={handleLogin} className="flex flex-col gap-4">
-                                            <input type="password" placeholder="PASSWORD" className={`p-4 rounded-xl border-2 text-center font-bold outline-none ${error ? 'border-red-500' : 'border-gray-200 focus:border-[#001f3f]'}`} value={passInput} onChange={e => {setPassInput(e.target.value); setError(false);}} autoFocus />
-                                            <button className="bg-[#001f3f] text-white p-4 rounded-xl font-black uppercase">Sblocca</button>
-                                        </form>
-                                    </div>
-                                ) : (
-                                    <div className="bg-gray-50 p-8 rounded-[30px] border-[2px] border-[#001f3f]">
-                                        <div className="flex justify-between items-center mb-8 border-b pb-4">
-                                            <h2 className="text-2xl font-black uppercase">Gestione Inventario</h2>
-                                            <button onClick={() => setIsAdminAuth(false)} className="text-red-500 font-black text-[10px] uppercase">Logout</button>
-                                        </div>
-                                        <form onSubmit={addProduct} className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                            <div className="flex flex-col gap-3">
-                                                <input placeholder="NOME PRODOTTO" className="p-4 border-2 rounded-xl font-bold uppercase" value={form.name} onChange={e => setForm({...form, name: e.target.value})} required />
-                                                <input placeholder="PREZZO €" className="p-4 border-2 rounded-xl font-bold" value={form.price} onChange={e => setForm({...form, price: e.target.value})} required />
-                                                <select className="p-4 border-2 rounded-xl font-bold" value={form.macro} onChange={e => setForm({...form, macro: e.target.value, sub: ''})} required>
-                                                    <option value="">MACRO</option>
-                                                    <option value="calcio">CALCIO</option>
-                                                    <option value="brand">BRAND</option>
-                                                </select>
-                                                <select className="p-4 border-2 rounded-xl font-bold" value={form.sub} onChange={e => setForm({...form, sub: e.target.value})} required disabled={!form.macro}>
-                                                    <option value="">SUB</option>
-                                                    {form.macro && CATEGORY_MAP[form.macro].map(s => <option key={s} value={s}>{s}</option>)}
-                                                </select>
-                                            </div>
-                                            <div className="flex flex-col gap-3">
-                                                <div className="flex justify-between"><span className="font-black text-[10px] opacity-40">IMMAGINI URL</span><button type="button" onClick={() => setForm({...form, imgs: [...form.imgs, '']})} className="text-green-600"><Icons.Plus /></button></div>
-                                                {form.imgs.map((im, idx) => (
-                                                    <input key={idx} placeholder="URL Immagine" className="p-3 border-2 rounded-lg text-xs" value={im} onChange={e => { const ni = [...form.imgs]; ni[idx] = e.target.value; setForm({...form, imgs: ni}); }} />
-                                                ))}
-                                                <textarea placeholder="DESCRIZIONE" className="p-4 border-2 rounded-xl font-bold flex-1" value={form.desc} onChange={e => setForm({...form, desc: e.target.value})} />
-                                            </div>
-                                            <button className="md:col-span-2 bg-[#001f3f] text-white p-5 rounded-xl font-black uppercase">Aggiungi al Catalogo</button>
-                                        </form>
-                                    </div>
-                                )}
-                            </div>
-                        )}
-
-                        {view === 'home' && (
-                            <div className="animate-fade-in">
-                                <div className="h-[400px] md:h-[500px] bg-[#001f3f] rounded-[40px] mb-8 flex items-end p-10 relative overflow-hidden">
-                                    <div className="absolute inset-0 opacity-10 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=800')] bg-cover bg-center"></div>
-                                    <h2 className="text-6xl md:text-9xl font-[900] text-white leading-none uppercase tracking-tighter z-10">SMAF STORE<br/></h2>
-                                </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                    <div onClick={() => {setCurrentMacro('calcio'); setView('category');}} className="p-16 border-4 border-[#001f3f] rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer group shadow-xl">
-                                        <h3 className="text-6xl font-black italic uppercase group-hover:-translate-y-2 transition-transform">KIT</h3>
-                                        <p className="text-xs font-bold opacity-40 uppercase">Calcio Selection</p>
-                                    </div>
-                                    <div onClick={() => {setCurrentMacro('brand'); setView('category');}} className="p-16 border-4 border-[#001f3f] rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer group shadow-xl">
-                                        <h3 className="text-6xl font-black italic uppercase group-hover:-translate-y-2 transition-transform">BRAND</h3>
-                                        <p className="text-xs font-bold opacity-40 uppercase">Streetwear Luxury</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'category' && (
-                            <div className="animate-fade-in">
-                                <div className="flex justify-between items-end mb-10">
-                                    <div>
-                                        <button onClick={() => setView('home')} className="flex items-center gap-2 font-black text-[10px] mb-4 opacity-40"><Icons.ChevronLeft /> HOME</button>
-                                        <h2 className="text-6xl md:text-8xl font-black uppercase tracking-tighter">{currentMacro}</h2>
-                                    </div>
-                                    <div className="relative w-full max-w-[300px] hidden md:block">
-                                        <input placeholder="CERCA..." className="w-full p-4 border-2 rounded-full px-8 font-bold outline-none" value={searchTerm} onChange={e => setSearchTerm(e.target.value)} />
-                                    </div>
-                                </div>
-                                <div className="flex gap-2 overflow-x-auto pb-4 mb-8 custom-scrollbar">
-                                    {['all', ...CATEGORY_MAP[currentMacro]].map(s => (
-                                        <button key={s} onClick={() => setCurrentSub(s)} className={`px-6 py-2 rounded-full font-black text-[10px] uppercase border-2 transition-all ${currentSub === s ? 'bg-[#001f3f] text-white border-[#001f3f]' : 'border-gray-200'}`}>{s}</button>
-                                    ))}
-                                </div>
-                                <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-                                    {filtered.map(p => (
-                                        <div key={p.id} onClick={() => {setSelectedProduct(p); setView('detail'); setImgIndex(0);}} className="cursor-pointer group">
-                                            <div className="aspect-[3/4] rounded-[25px] overflow-hidden border-2 mb-4 relative bg-gray-50">
-                                                <img src={p.imgs[0]} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
-                                                {isAdminAuth && <button onClick={(e) => {e.stopPropagation(); setItems(items.filter(it => it.id !== p.id));}} className="absolute top-2 right-2 bg-red-500 text-white p-2 rounded-full"><Icons.Trash /></button>}
-                                            </div>
-                                            <h4 className="font-black uppercase tracking-tighter leading-none">{p.name}</h4>
-                                            <p className="text-sm font-bold opacity-40 italic">€ {p.price}</p>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {view === 'detail' && selectedProduct && (
-                            <div className="animate-slide-up flex flex-col md:flex-row gap-12 pt-10">
-                                <div className="w-full md:w-1/2 aspect-square rounded-[40px] overflow-hidden border-2 bg-gray-50">
-                                    <img src={selectedProduct.imgs[imgIndex]} className="w-full h-full object-cover" />
-                                </div>
-                                <div className="w-full md:w-1/2 flex flex-col justify-center">
-                                    <button onClick={() => setView('category')} className="mb-6 opacity-30 font-black text-[10px] uppercase flex items-center gap-2"><Icons.ChevronLeft /> INDIETRO</button>
-                                    <h2 className="text-5xl md:text-7xl font-black uppercase tracking-tighter leading-[0.8] mb-6">{selectedProduct.name}</h2>
-                                    <p className="text-4xl font-black italic text-[#001f3f] mb-8">€ {selectedProduct.price}</p>
-                                    <div className="p-6 bg-gray-50 rounded-2xl border-l-8 border-[#001f3f] mb-8">
-                                        <p className="font-bold text-gray-600">{selectedProduct.desc}</p>
-                                    </div>
-                                    <button className="w-full bg-[#001f3f] text-white p-8 rounded-[25px] font-black uppercase text-xl shadow-xl hover:scale-[1.02] active:scale-95 transition-all">Ordina su WhatsApp</button>
-                                </div>
-                            </div>
-                        )}
-                    </main>
-                </div>
-            );
+        // --- FUNZIONI DI PERSISTENZA (LOCAL STORAGE) ---
+        function loadData() {
+            const savedData = localStorage.getItem(STORAGE_KEY);
+            if (savedData) {
+                state.items = JSON.parse(savedData);
+            } else {
+                state.items = INITIAL_ITEMS;
+                saveData();
+            }
         }
 
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(<App />);
+        function saveData() {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
+        }
+
+        // --- GESTIONE STATO ---
+        function updateState(newState) {
+            state = { ...state, ...newState };
+            render();
+        }
+
+        // --- LOGICA ADMIN ---
+        function handleLogin(e) {
+            e.preventDefault();
+            if (state.passwordInput === ADMIN_PASSWORD) {
+                updateState({ isAdminAuthenticated: true, loginError: false, passwordInput: '' });
+            } else {
+                updateState({ loginError: true });
+            }
+        }
+
+        function handleLogout() {
+            updateState({ isAdminAuthenticated: false, showAdmin: false, passwordInput: '' });
+        }
+
+        function handleDelete(id) {
+            if (confirm("Eliminare definitivamente questo prodotto?")) {
+                state.items = state.items.filter(i => i.id !== id);
+                saveData(); // Salva dopo l'eliminazione
+                updateState({});
+            }
+        }
+
+        function handleAddProduct(e) {
+            e.preventDefault();
+            const validImgs = state.formData.imgs.filter(img => img.trim() !== '');
+            if (validImgs.length === 0) return;
+
+            const newProduct = {
+                ...state.formData,
+                id: Date.now().toString(),
+                name: state.formData.name.toUpperCase(),
+                imgs: validImgs
+            };
+
+            state.items.push(newProduct);
+            saveData(); // Salva nel browser
+            
+            updateState({
+                formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
+                showAdmin: false
+            });
+        }
+
+        // --- MOTORE DI RENDERING ---
+        function render() {
+            const root = document.getElementById('root');
+            root.innerHTML = '';
+
+            const header = `
+                <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center max-w-[1600px] xl:mx-auto border-[2px] border-[#001f3f] rounded-[30px] bg-white shadow-sm sticky top-4 z-50">
+                    <h1 class="text-3xl md:text-5xl font-[1000] tracking-[-0.08em] cursor-pointer leading-none uppercase" onclick="updateState({view: 'home', currentMacro: null, searchTerm: ''})">
+                        ELITE APPAREL
+                    </h1>
+                    <button onclick="updateState({showAdmin: !state.showAdmin})" 
+                            class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${state.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white hover:bg-black'}">
+                        <i data-lucide="${state.isAdminAuthenticated ? 'log-out' : 'lock'}" class="w-4 h-4"></i>
+                        ${state.showAdmin ? 'CHIUDI' : 'ADMIN'}
+                    </button>
+                </header>
+            `;
+
+            let mainContent = '<main class="max-w-[1600px] mx-auto px-6 md:px-10">';
+
+            if (state.showAdmin) {
+                mainContent += `
+                    <section class="mt-6 animate-fade-in">
+                        <div class="bg-gray-50 p-8 border-[2px] border-[#001f3f] rounded-[40px] shadow-xl">
+                            ${!state.isAdminAuthenticated ? `
+                                <div class="max-w-md mx-auto py-10 text-center">
+                                    <h2 class="text-3xl font-black uppercase tracking-tighter mb-4">Accesso Admin</h2>
+                                    <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
+                                        <input type="password" placeholder="PASSWORD" 
+                                               class="p-5 border-[2px] rounded-[20px] font-bold text-center outline-none ${state.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200'}"
+                                               oninput="state.passwordInput = this.value">
+                                        <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase">Entra</button>
+                                    </form>
+                                </div>
+                            ` : `
+                                <div class="flex justify-between mb-8 items-center border-b pb-6">
+                                    <h2 class="text-3xl font-black uppercase tracking-tighter">Nuovo Articolo</h2>
+                                    <button onclick="handleLogout()" class="text-red-500 font-black text-[10px] uppercase">Esci</button>
+                                </div>
+                                <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    <div class="flex flex-col gap-4">
+                                        <input placeholder="NOME" class="p-5 border-2 rounded-[20px] font-bold uppercase" oninput="state.formData.name = this.value" required>
+                                        <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase" oninput="state.formData.price = this.value" required>
+                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white" onchange="state.formData.macro = this.value; render()" required>
+                                            <option value="">MACRO CATEGORIA</option>
+                                            <option value="calcio">CALCIO</option>
+                                            <option value="brand">BRAND</option>
+                                        </select>
+                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white" onchange="state.formData.sub = this.value" required ${!state.formData.macro ? 'disabled' : ''}>
+                                            <option value="">SOTTO CATEGORIA</option>
+                                            ${state.formData.macro ? CATEGORY_MAP[state.formData.macro].map(s => `<option value="${s}">${s}</option>`).join('') : ''}
+                                        </select>
+                                    </div>
+                                    <div class="flex flex-col gap-4">
+                                        <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase" rows="3" oninput="state.formData.desc = this.value" required></textarea>
+                                        <input placeholder="URL IMMAGINE" class="p-5 border-2 rounded-[20px] font-bold" oninput="state.formData.imgs[0] = this.value" required>
+                                        <button type="submit" class="bg-[#001f3f] text-white p-6 font-black uppercase rounded-[25px]">Salva Articolo</button>
+                                    </div>
+                                </form>
+                            `}
+                        </div>
+                    </section>
+                `;
+            }
+
+            if (state.view === 'home') {
+                mainContent += `
+                    <div class="py-8 animate-fade-in">
+                        <div class="relative h-[450px] md:h-[600px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[50px] border-[2px] border-[#001f3f]">
+                            <div class="absolute inset-0 grayscale opacity-20 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover bg-center"></div>
+                            <div class="z-10">
+                                <h2 class="text-7xl md:text-[11rem] font-black text-white leading-[0.8] uppercase tracking-[-0.08em] mb-4">ARCHIVE<br>22—25</h2>
+                                <span class="bg-white text-[#001f3f] px-6 py-2 rounded-full text-sm font-black uppercase tracking-widest italic">DATI SALVATI NEL BROWSER</span>
+                            </div>
+                        </div>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group cursor-pointer border-[2px] border-[#001f3f] p-12 rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all bg-white">
+                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">KIT</h3>
+                                <div class="text-sm font-black uppercase mt-4 opacity-40">CALCIO SELECTION</div>
+                            </div>
+                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group cursor-pointer border-[2px] border-[#001f3f] p-12 rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all bg-white">
+                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">BRAND</h3>
+                                <div class="text-sm font-black uppercase mt-4 opacity-40">STREETWEAR LUXURY</div>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            } else if (state.view === 'category') {
+                const filtered = state.items.filter(item => {
+                    const macroMatch = item.macro === state.currentMacro;
+                    const subMatch = state.currentSub === 'all' || item.sub === state.currentSub;
+                    const searchMatch = item.name.toLowerCase().includes(state.searchTerm.toLowerCase());
+                    return macroMatch && subMatch && searchMatch;
+                });
+
+                mainContent += `
+                    <div class="py-8 animate-fade-in">
+                        <div class="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
+                            <div class="w-full">
+                                <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-6 flex items-center gap-2 bg-gray-100 px-5 py-2 rounded-full w-fit">
+                                    <i data-lucide="home" class="w-3 h-3"></i> HOME
+                                </button>
+                                <h2 class="text-6xl md:text-[9rem] font-black uppercase tracking-tighter leading-none">${state.currentMacro}</h2>
+                            </div>
+                            <div class="w-full md:w-[400px] relative">
+                                <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5"></i>
+                                <input placeholder="CERCA..." class="w-full border-2 border-gray-200 rounded-[25px] p-5 pl-14 text-xl font-black uppercase outline-none focus:border-[#001f3f]" 
+                                       value="${state.searchTerm}" oninput="state.searchTerm = this.value; render()">
+                            </div>
+                        </div>
+                        <div class="flex flex-wrap gap-3 mb-16">
+                            ${['all', ...CATEGORY_MAP[state.currentMacro]].map(s => `
+                                <button onclick="updateState({currentSub: '${s}'})" class="px-8 py-3 font-black uppercase text-[10px] border-2 border-[#001f3f] rounded-full transition-all ${state.currentSub === s ? 'bg-[#001f3f] text-white scale-105' : 'bg-white hover:bg-gray-50'}">
+                                    ${s}
+                                </button>
+                            `).join('')}
+                        </div>
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-10">
+                            ${filtered.map(item => `
+                                <div class="group relative cursor-pointer" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
+                                    ${state.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-4 right-4 z-20 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
+                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[35px] mb-5 relative bg-gray-50">
+                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
+                                        <div class="absolute top-5 left-5 bg-[#001f3f] text-white px-4 py-1 font-black text-[9px] uppercase rounded-full">${item.sub}</div>
+                                    </div>
+                                    <h3 class="text-2xl font-black uppercase tracking-tighter mb-1">${item.name}</h3>
+                                    <p class="text-lg font-black italic text-gray-300">€ ${item.price}</p>
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                `;
+            } else if (state.view === 'detail' && state.selectedProduct) {
+                const p = state.selectedProduct;
+                mainContent += `
+                    <div class="py-12 animate-fade-in">
+                        <button onclick="updateState({view: 'category'})" class="mb-10 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-6 py-3 rounded-full border border-gray-200">
+                            <i data-lucide="chevron-left" class="w-4 h-4"></i> TORNA ALLA GALLERY
+                        </button>
+                        <div class="flex flex-col lg:flex-row gap-16">
+                            <div class="w-full lg:w-3/5 border-2 border-gray-100 aspect-square overflow-hidden rounded-[50px] bg-gray-50">
+                                <img src="${p.imgs[0]}" class="w-full h-full object-cover">
+                            </div>
+                            <div class="w-full lg:w-2/5 flex flex-col justify-center">
+                                <span class="text-gray-300 font-black text-sm uppercase mb-4">${p.sub}</span>
+                                <h2 class="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8] mb-8">${p.name}</h2>
+                                <p class="text-6xl font-black italic text-[#001f3f] mb-12">€ ${p.price}</p>
+                                <div class="bg-gray-50 p-10 border-l-[10px] border-[#001f3f] rounded-[30px] mb-10">
+                                    <p class="text-xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
+                                </div>
+                                <button class="w-full bg-[#001f3f] text-white py-10 text-2xl font-black uppercase rounded-[30px] shadow-xl">ORDINA ORA</button>
+                            </div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            mainContent += '</main>';
+            root.innerHTML = header + mainContent;
+            lucide.createIcons();
+        }
+
+        // --- AVVIO ---
+        window.onload = () => {
+            loadData(); // Carica dal LocalStorage all'avvio
+            render();
+        };
     </script>
 </body>
 </html>
