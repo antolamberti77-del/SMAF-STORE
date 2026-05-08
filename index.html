@@ -3,10 +3,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Elite Apparel Store</title>
-    <!-- Tailwind CSS per lo stile moderno -->
+    <title>Elite Apparel Store | Cloud Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Lucide Icons per le icone -->
     <script src="https://unpkg.com/lucide@latest"></script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
@@ -16,58 +14,70 @@
             background-color: white;
             color: #001f3f;
             margin: 0;
+            overflow-x: hidden;
         }
 
-        .font-heavy { font-weight: 1000; }
-        
-        .animate-fade-in {
-            animation: fadeIn 0.5s ease-out forwards;
-        }
+        .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(10px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
-
-        .no-scrollbar::-webkit-scrollbar { display: none; }
-        .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-
-        ::selection {
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
             background: #001f3f;
             color: white;
+            padding: 16px 30px;
+            border-radius: 20px;
+            font-weight: 900;
+            text-transform: uppercase;
+            font-size: 12px;
+            z-index: 1000;
+            display: none;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
         }
+
+        .img-zoom:hover img { transform: scale(1.05); }
+        .no-scrollbar::-webkit-scrollbar { display: none; }
+        
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #001f3f;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+        }
+        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
     </style>
 </head>
 <body class="pb-20">
 
+    <div id="toast" class="toast">Azione Completata</div>
     <div id="root"></div>
 
-    <script>
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, deleteDoc, doc, query } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        // --- FIREBASE CONFIG ---
+        const firebaseConfig = JSON.parse(__firebase_config);
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'elite-store-default';
+
         // --- CONFIGURAZIONE ---
         const CATEGORY_MAP = {
             'calcio': ['Serie A', 'Premier League', 'La Liga', 'Ligue 1', 'Champions League', 'Nazionali'],
             'brand': ['Nike', 'Adidas', 'Ralph Lauren', 'Stone Island', 'Lacoste']
         };
 
-        const ADMIN_PASSWORD = "15m09c20@";
-        const STORAGE_KEY = 'elite_apparel_data';
+        const ADMIN_PASSWORD = "ELITE2025";
 
-        // --- DATI INIZIALI (Se il database locale è vuoto) ---
-        const INITIAL_ITEMS = [
-            {
-                id: '1',
-                name: 'JERSEY MILAN HOME 24/25',
-                price: '89.99',
-                macro: 'calcio',
-                sub: 'Serie A',
-                desc: 'La nuova maglia home del Milan per la stagione 2024/2025. Design iconico a strisce rossonere.',
-                imgs: ['https://images.unsplash.com/photo-1624365160322-835692631566?w=800']
-            }
-        ];
-
-        // --- STATO DELL'APP ---
+        // --- STATO ---
         let state = {
-            items: [], // Verrà popolato dal LocalStorage
+            items: [],
             view: 'home',
             currentMacro: null,
             currentSub: 'all',
@@ -77,130 +87,195 @@
             passwordInput: '',
             loginError: false,
             searchTerm: '',
+            imgIndex: 0,
+            loading: true,
             formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] }
         };
 
-        // --- FUNZIONI DI PERSISTENZA (LOCAL STORAGE) ---
-        function loadData() {
-            const savedData = localStorage.getItem(STORAGE_KEY);
-            if (savedData) {
-                state.items = JSON.parse(savedData);
-            } else {
-                state.items = INITIAL_ITEMS;
-                saveData();
+        // --- UTILS ---
+        function showToast(msg) {
+            const t = document.getElementById('toast');
+            if(!t) return;
+            t.innerText = msg;
+            t.style.display = 'block';
+            setTimeout(() => { t.style.display = 'none'; }, 3000);
+        }
+
+        async function initAuth() {
+            try {
+                await signInAnonymously(auth);
+            } catch (error) {
+                console.error("Auth error:", error);
             }
         }
 
-        function saveData() {
-            localStorage.setItem(STORAGE_KEY, JSON.stringify(state.items));
-        }
-
-        // --- GESTIONE STATO ---
-        function updateState(newState) {
-            state = { ...state, ...newState };
-            render();
-        }
-
-        // --- LOGICA ADMIN ---
-        function handleLogin(e) {
-            e.preventDefault();
-            if (state.passwordInput === ADMIN_PASSWORD) {
-                updateState({ isAdminAuthenticated: true, loginError: false, passwordInput: '' });
-            } else {
-                updateState({ loginError: true });
-            }
-        }
-
-        function handleLogout() {
-            updateState({ isAdminAuthenticated: false, showAdmin: false, passwordInput: '' });
-        }
-
-        function handleDelete(id) {
-            if (confirm("Eliminare definitivamente questo prodotto?")) {
-                state.items = state.items.filter(i => i.id !== id);
-                saveData(); // Salva dopo l'eliminazione
-                updateState({});
-            }
-        }
-
-        function handleAddProduct(e) {
-            e.preventDefault();
-            const validImgs = state.formData.imgs.filter(img => img.trim() !== '');
-            if (validImgs.length === 0) return;
-
-            const newProduct = {
-                ...state.formData,
-                id: Date.now().toString(),
-                name: state.formData.name.toUpperCase(),
-                imgs: validImgs
-            };
-
-            state.items.push(newProduct);
-            saveData(); // Salva nel browser
+        function setupRealtimeUpdates(user) {
+            if (!user) return;
+            const dataCol = collection(db, 'artifacts', appId, 'public', 'data', 'products');
             
-            updateState({
-                formData: { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] },
-                showAdmin: false
+            onSnapshot(dataCol, (snapshot) => {
+                const items = [];
+                snapshot.forEach((doc) => {
+                    items.push({ id: doc.id, ...doc.data() });
+                });
+                state.items = items;
+                state.loading = false;
+                render();
+            }, (error) => {
+                console.error("Firestore error:", error);
+                state.loading = false;
+                render();
             });
         }
 
-        // --- MOTORE DI RENDERING ---
+        // Espongo le funzioni al window per usarle negli attributi HTML (onclick)
+        window.updateState = (newState) => {
+            state = { ...state, ...newState };
+            render();
+        };
+
+        window.handleLogin = (e) => {
+            e.preventDefault();
+            if (state.passwordInput === ADMIN_PASSWORD) {
+                state.isAdminAuthenticated = true;
+                state.loginError = false;
+                showToast("Accesso Eseguito");
+            } else {
+                state.loginError = true;
+            }
+            render();
+        };
+
+        window.handleAddImgField = () => {
+            state.formData.imgs.push('');
+            render();
+        };
+
+        window.handleRemoveImgField = (index) => {
+            if (state.formData.imgs.length > 1) {
+                state.formData.imgs.splice(index, 1);
+                render();
+            }
+        };
+
+        window.handleAddProduct = async (e) => {
+            e.preventDefault();
+            if (!auth.currentUser) return;
+
+            const validImgs = state.formData.imgs.filter(url => url.trim() !== '');
+            if (validImgs.length === 0) {
+                showToast("Inserisci almeno un'immagine");
+                return;
+            }
+
+            const newItem = {
+                name: state.formData.name.toUpperCase(),
+                price: state.formData.price,
+                macro: state.formData.macro,
+                sub: state.formData.sub,
+                desc: state.formData.desc,
+                imgs: validImgs,
+                createdAt: Date.now()
+            };
+
+            try {
+                await addDoc(collection(db, 'artifacts', appId, 'public', 'data', 'products'), newItem);
+                showToast("Prodotto Pubblicato");
+                state.showAdmin = false;
+                state.formData = { name: '', price: '', macro: '', sub: '', desc: '', imgs: [''] };
+                render();
+            } catch (err) {
+                showToast("Errore durante il salvataggio");
+            }
+        };
+
+        window.handleDelete = async (id) => {
+            if (!auth.currentUser) return;
+            if (confirm("Sei sicuro di voler eliminare questo prodotto?")) {
+                try {
+                    await deleteDoc(doc(db, 'artifacts', appId, 'public', 'data', 'products', id));
+                    showToast("Prodotto Eliminato");
+                } catch (err) {
+                    showToast("Errore durante l'eliminazione");
+                }
+            }
+        };
+
+        // --- RENDERING ---
         function render() {
             const root = document.getElementById('root');
+            if(!root) return;
             root.innerHTML = '';
 
             const header = `
                 <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center max-w-[1600px] xl:mx-auto border-[2px] border-[#001f3f] rounded-[30px] bg-white shadow-sm sticky top-4 z-50">
-                    <h1 class="text-3xl md:text-5xl font-[1000] tracking-[-0.08em] cursor-pointer leading-none uppercase" onclick="updateState({view: 'home', currentMacro: null, searchTerm: ''})">
+                    <h1 class="text-3xl md:text-5xl font-[1000] tracking-[-0.08em] cursor-pointer leading-none uppercase" onclick="updateState({view: 'home', currentMacro: null})">
                         ELITE APPAREL
                     </h1>
-                    <button onclick="updateState({showAdmin: !state.showAdmin})" 
-                            class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${state.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white hover:bg-black'}">
-                        <i data-lucide="${state.isAdminAuthenticated ? 'log-out' : 'lock'}" class="w-4 h-4"></i>
-                        ${state.showAdmin ? 'CHIUDI' : 'ADMIN'}
-                    </button>
+                    <div class="flex items-center gap-4">
+                        ${state.loading ? '<div class="loader"></div>' : ''}
+                        <button onclick="updateState({showAdmin: !state.showAdmin})" 
+                                class="px-6 py-3 rounded-full font-black uppercase text-[10px] transition-all flex items-center gap-2 ${state.showAdmin ? 'bg-red-500 text-white' : 'bg-[#001f3f] text-white hover:bg-black'}">
+                            <i data-lucide="${state.isAdminAuthenticated ? 'log-out' : 'lock'}" class="w-4 h-4"></i>
+                            ${state.showAdmin ? 'CHIUDI' : 'ADMIN'}
+                        </button>
+                    </div>
                 </header>
             `;
 
-            let mainContent = '<main class="max-w-[1600px] mx-auto px-6 md:px-10">';
+            let content = '<main class="max-w-[1600px] mx-auto px-6 md:px-10">';
 
             if (state.showAdmin) {
-                mainContent += `
+                content += `
                     <section class="mt-6 animate-fade-in">
-                        <div class="bg-gray-50 p-8 border-[2px] border-[#001f3f] rounded-[40px] shadow-xl">
+                        <div class="bg-gray-50 p-8 border-[2px] border-[#001f3f] rounded-[40px] shadow-2xl">
                             ${!state.isAdminAuthenticated ? `
                                 <div class="max-w-md mx-auto py-10 text-center">
-                                    <h2 class="text-3xl font-black uppercase tracking-tighter mb-4">Accesso Admin</h2>
+                                    <h2 class="text-3xl font-black uppercase tracking-tighter mb-6">Area Riservata</h2>
+                                    <p class="mb-4 text-xs font-bold opacity-50 uppercase">Inserisci la password amministratore</p>
                                     <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
                                         <input type="password" placeholder="PASSWORD" 
-                                               class="p-5 border-[2px] rounded-[20px] font-bold text-center outline-none ${state.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200'}"
+                                               class="p-5 border-[2px] rounded-[20px] font-bold text-center outline-none ${state.loginError ? 'border-red-500 bg-red-50' : 'border-gray-200 focus:border-[#001f3f]'}"
                                                oninput="state.passwordInput = this.value">
-                                        <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase">Entra</button>
+                                        <button type="submit" class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase hover:bg-black transition-all">Accedi</button>
                                     </form>
                                 </div>
                             ` : `
                                 <div class="flex justify-between mb-8 items-center border-b pb-6">
-                                    <h2 class="text-3xl font-black uppercase tracking-tighter">Nuovo Articolo</h2>
-                                    <button onclick="handleLogout()" class="text-red-500 font-black text-[10px] uppercase">Esci</button>
+                                    <h2 class="text-3xl font-black uppercase tracking-tighter italic">Nuovo Prodotto Cloud</h2>
+                                    <button onclick="updateState({isAdminAuthenticated: false, showAdmin: false})" class="bg-red-100 text-red-600 px-4 py-2 rounded-full font-black text-[10px] uppercase">Esci</button>
                                 </div>
-                                <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <form onsubmit="handleAddProduct(event)" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                                     <div class="flex flex-col gap-4">
-                                        <input placeholder="NOME" class="p-5 border-2 rounded-[20px] font-bold uppercase" oninput="state.formData.name = this.value" required>
-                                        <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase" oninput="state.formData.price = this.value" required>
-                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white" onchange="state.formData.macro = this.value; render()" required>
-                                            <option value="">MACRO CATEGORIA</option>
-                                            <option value="calcio">CALCIO</option>
-                                            <option value="brand">BRAND</option>
-                                        </select>
-                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white" onchange="state.formData.sub = this.value" required ${!state.formData.macro ? 'disabled' : ''}>
-                                            <option value="">SOTTO CATEGORIA</option>
+                                        <input placeholder="NOME ARTICOLO" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="state.formData.name = this.value" required>
+                                        <div class="grid grid-cols-2 gap-4">
+                                            <input placeholder="PREZZO €" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" oninput="state.formData.price = this.value" required>
+                                            <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="state.formData.macro = this.value; render()" required>
+                                                <option value="">CATEGORIA</option>
+                                                <option value="calcio">CALCIO</option>
+                                                <option value="brand">BRAND</option>
+                                            </select>
+                                        </div>
+                                        <select class="p-5 border-2 rounded-[20px] font-bold uppercase bg-white outline-none" onchange="state.formData.sub = this.value" required ${!state.formData.macro ? 'disabled' : ''}>
+                                            <option value="">SOTTO-CATEGORIA</option>
                                             ${state.formData.macro ? CATEGORY_MAP[state.formData.macro].map(s => `<option value="${s}">${s}</option>`).join('') : ''}
                                         </select>
+                                        <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase outline-none focus:border-[#001f3f]" rows="3" oninput="state.formData.desc = this.value" required></textarea>
                                     </div>
-                                    <div class="flex flex-col gap-4">
-                                        <textarea placeholder="DESCRIZIONE" class="p-5 border-2 rounded-[20px] font-bold uppercase" rows="3" oninput="state.formData.desc = this.value" required></textarea>
-                                        <input placeholder="URL IMMAGINE" class="p-5 border-2 rounded-[20px] font-bold" oninput="state.formData.imgs[0] = this.value" required>
-                                        <button type="submit" class="bg-[#001f3f] text-white p-6 font-black uppercase rounded-[25px]">Salva Articolo</button>
+                                    <div class="flex flex-col gap-4 bg-white p-6 rounded-[30px] border-2 border-gray-100">
+                                        <div class="flex justify-between items-center">
+                                            <h3 class="font-black text-xs uppercase tracking-widest opacity-40">Immagini (URL)</h3>
+                                            <button type="button" onclick="handleAddImgField()" class="bg-[#001f3f] text-white p-2 rounded-full"><i data-lucide="plus" class="w-4 h-4"></i></button>
+                                        </div>
+                                        <div class="max-h-[220px] overflow-y-auto pr-2 space-y-3">
+                                            ${state.formData.imgs.map((img, idx) => `
+                                                <div class="flex gap-2">
+                                                    <input placeholder="FOTO ${idx + 1}" class="flex-1 p-4 border-2 rounded-[15px] text-xs font-bold" value="${img}" oninput="state.formData.imgs[${idx}] = this.value" required>
+                                                    <button type="button" onclick="handleRemoveImgField(${idx})" class="text-red-500 p-2"><i data-lucide="trash-2" class="w-5 h-5"></i></button>
+                                                </div>
+                                            `).join('')}
+                                        </div>
+                                        <button type="submit" class="mt-auto bg-[#001f3f] text-white p-6 font-black uppercase rounded-[20px] hover:bg-black shadow-lg">Salva nel Database</button>
                                     </div>
                                 </form>
                             `}
@@ -210,67 +285,69 @@
             }
 
             if (state.view === 'home') {
-                mainContent += `
+                content += `
                     <div class="py-8 animate-fade-in">
-                        <div class="relative h-[450px] md:h-[600px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[50px] border-[2px] border-[#001f3f]">
+                        <div class="relative h-[500px] md:h-[700px] bg-[#001f3f] mb-10 overflow-hidden flex items-end p-10 rounded-[60px] border-[2px] border-[#001f3f]">
                             <div class="absolute inset-0 grayscale opacity-20 bg-[url('https://images.unsplash.com/photo-1551232864-3f0890e580d9?w=1200')] bg-cover bg-center"></div>
-                            <div class="z-10">
-                                <h2 class="text-7xl md:text-[11rem] font-black text-white leading-[0.8] uppercase tracking-[-0.08em] mb-4">ARCHIVE<br>22—25</h2>
-                                <span class="bg-white text-[#001f3f] px-6 py-2 rounded-full text-sm font-black uppercase tracking-widest italic">DATI SALVATI NEL BROWSER</span>
+                            <div class="z-10 w-full">
+                                <p class="text-white/40 font-black text-xs tracking-[0.5em] mb-4">ELITE SELECTION — 2026</p>
+                                <h2 class="text-7xl md:text-[13rem] font-black text-white leading-[0.75] uppercase tracking-[-0.09em] mb-8">PURE<br>STYLE</h2>
+                                <div class="flex gap-4">
+                                    <span class="bg-white text-[#001f3f] px-8 py-3 rounded-full text-xs font-black uppercase italic">CLOUD ACTIVE</span>
+                                    <span class="border border-white/30 text-white px-8 py-3 rounded-full text-xs font-black uppercase italic">REALTIME DB</span>
+                                </div>
                             </div>
                         </div>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
-                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group cursor-pointer border-[2px] border-[#001f3f] p-12 rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all bg-white">
-                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">KIT</h3>
-                                <div class="text-sm font-black uppercase mt-4 opacity-40">CALCIO SELECTION</div>
+                            <div onclick="updateState({currentMacro: 'calcio', view: 'category', currentSub: 'all'})" class="group relative overflow-hidden cursor-pointer border-[2px] border-[#001f3f] p-16 rounded-[50px] bg-white transition-all hover:bg-[#001f3f] hover:text-white">
+                                <h3 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none relative z-10 group-hover:-translate-y-2 transition-transform">KIT</h3>
+                                <p class="text-sm font-black uppercase mt-4 opacity-40 group-hover:opacity-100 transition-opacity">Football Heritage</p>
+                                <i data-lucide="arrow-up-right" class="absolute top-10 right-10 w-12 h-12 opacity-10 group-hover:opacity-100 transition-opacity"></i>
                             </div>
-                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group cursor-pointer border-[2px] border-[#001f3f] p-12 rounded-[40px] hover:bg-[#001f3f] hover:text-white transition-all bg-white">
-                                <h3 class="text-6xl md:text-8xl font-black uppercase italic tracking-tighter leading-none">BRAND</h3>
-                                <div class="text-sm font-black uppercase mt-4 opacity-40">STREETWEAR LUXURY</div>
+                            <div onclick="updateState({currentMacro: 'brand', view: 'category', currentSub: 'all'})" class="group relative overflow-hidden cursor-pointer border-[2px] border-[#001f3f] p-16 rounded-[50px] bg-white transition-all hover:bg-[#001f3f] hover:text-white">
+                                <h3 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none relative z-10 group-hover:-translate-y-2 transition-transform">BRAND</h3>
+                                <p class="text-sm font-black uppercase mt-4 opacity-40 group-hover:opacity-100 transition-opacity">Street Essentials</p>
+                                <i data-lucide="arrow-up-right" class="absolute top-10 right-10 w-12 h-12 opacity-10 group-hover:opacity-100 transition-opacity"></i>
                             </div>
                         </div>
                     </div>
                 `;
             } else if (state.view === 'category') {
-                const filtered = state.items.filter(item => {
-                    const macroMatch = item.macro === state.currentMacro;
-                    const subMatch = state.currentSub === 'all' || item.sub === state.currentSub;
-                    const searchMatch = item.name.toLowerCase().includes(state.searchTerm.toLowerCase());
-                    return macroMatch && subMatch && searchMatch;
-                });
-
-                mainContent += `
+                const filtered = state.items.filter(i => i.macro === state.currentMacro && (state.currentSub === 'all' || i.sub === state.currentSub) && i.name.toLowerCase().includes(state.searchTerm.toLowerCase()));
+                
+                content += `
                     <div class="py-8 animate-fade-in">
                         <div class="flex flex-col md:flex-row justify-between items-end gap-6 mb-12">
                             <div class="w-full">
-                                <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-6 flex items-center gap-2 bg-gray-100 px-5 py-2 rounded-full w-fit">
-                                    <i data-lucide="home" class="w-3 h-3"></i> HOME
+                                <button onclick="updateState({view: 'home'})" class="font-black uppercase text-[10px] mb-8 flex items-center gap-2 bg-gray-100 px-6 py-3 rounded-full w-fit hover:bg-black hover:text-white transition-all">
+                                    <i data-lucide="chevron-left" class="w-4 h-4"></i> HOME
                                 </button>
-                                <h2 class="text-6xl md:text-[9rem] font-black uppercase tracking-tighter leading-none">${state.currentMacro}</h2>
+                                <h2 class="text-6xl md:text-[10rem] font-black uppercase tracking-tighter leading-none">${state.currentMacro}</h2>
                             </div>
-                            <div class="w-full md:w-[400px] relative">
-                                <i data-lucide="search" class="absolute left-5 top-1/2 -translate-y-1/2 text-gray-400 w-5 h-5"></i>
-                                <input placeholder="CERCA..." class="w-full border-2 border-gray-200 rounded-[25px] p-5 pl-14 text-xl font-black uppercase outline-none focus:border-[#001f3f]" 
+                            <div class="w-full md:w-[450px] relative group">
+                                <i data-lucide="search" class="absolute left-6 top-1/2 -translate-y-1/2 text-gray-400 w-6 h-6 group-focus-within:text-[#001f3f]"></i>
+                                <input placeholder="CERCA..." class="w-full border-2 border-gray-200 rounded-[30px] p-6 pl-16 text-xl font-black uppercase outline-none focus:border-[#001f3f] transition-all bg-gray-50 focus:bg-white" 
                                        value="${state.searchTerm}" oninput="state.searchTerm = this.value; render()">
                             </div>
                         </div>
-                        <div class="flex flex-wrap gap-3 mb-16">
+                        <div class="flex flex-wrap gap-3 mb-16 no-scrollbar overflow-x-auto pb-4">
                             ${['all', ...CATEGORY_MAP[state.currentMacro]].map(s => `
-                                <button onclick="updateState({currentSub: '${s}'})" class="px-8 py-3 font-black uppercase text-[10px] border-2 border-[#001f3f] rounded-full transition-all ${state.currentSub === s ? 'bg-[#001f3f] text-white scale-105' : 'bg-white hover:bg-gray-50'}">
+                                <button onclick="updateState({currentSub: '${s}'})" class="whitespace-nowrap px-10 py-4 font-black uppercase text-[11px] tracking-widest border-2 border-[#001f3f] rounded-full transition-all ${state.currentSub === s ? 'bg-[#001f3f] text-white' : 'bg-white hover:bg-gray-100'}">
                                     ${s}
                                 </button>
                             `).join('')}
                         </div>
-                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-10">
+                        ${filtered.length === 0 ? '<div class="py-20 text-center font-black uppercase opacity-20 text-4xl">Nessun prodotto trovato</div>' : ''}
+                        <div class="grid grid-cols-2 lg:grid-cols-4 gap-12">
                             ${filtered.map(item => `
-                                <div class="group relative cursor-pointer" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail"})'>
-                                    ${state.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-4 right-4 z-20 bg-red-500 text-white p-2 rounded-full opacity-0 group-hover:opacity-100"><i data-lucide="trash-2" class="w-4 h-4"></i></button>` : ''}
-                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[35px] mb-5 relative bg-gray-50">
-                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500">
-                                        <div class="absolute top-5 left-5 bg-[#001f3f] text-white px-4 py-1 font-black text-[9px] uppercase rounded-full">${item.sub}</div>
+                                <div class="group relative cursor-pointer img-zoom" onclick='updateState({selectedProduct: ${JSON.stringify(item).replace(/'/g, "&apos;")}, view: "detail", imgIndex: 0})'>
+                                    ${state.isAdminAuthenticated ? `<button onclick="event.stopPropagation(); handleDelete('${item.id}')" class="absolute top-6 right-6 z-20 bg-red-500 text-white p-3 rounded-full opacity-0 group-hover:opacity-100 shadow-xl"><i data-lucide="trash-2" class="w-5 h-5"></i></button>` : ''}
+                                    <div class="aspect-[3/4] overflow-hidden border-2 border-gray-100 rounded-[45px] mb-6 relative bg-gray-50 shadow-sm">
+                                        <img src="${item.imgs[0]}" class="w-full h-full object-cover transition-transform duration-700">
+                                        <div class="absolute bottom-6 left-6 bg-[#001f3f] text-white px-5 py-2 font-black text-[10px] uppercase rounded-full shadow-lg">${item.sub}</div>
                                     </div>
-                                    <h3 class="text-2xl font-black uppercase tracking-tighter mb-1">${item.name}</h3>
-                                    <p class="text-lg font-black italic text-gray-300">€ ${item.price}</p>
+                                    <h3 class="text-3xl font-black uppercase tracking-tighter mb-1 leading-none">${item.name}</h3>
+                                    <p class="text-xl font-black italic text-[#001f3f]/30">€ ${item.price}</p>
                                 </div>
                             `).join('')}
                         </div>
@@ -278,38 +355,50 @@
                 `;
             } else if (state.view === 'detail' && state.selectedProduct) {
                 const p = state.selectedProduct;
-                mainContent += `
+                content += `
                     <div class="py-12 animate-fade-in">
-                        <button onclick="updateState({view: 'category'})" class="mb-10 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-6 py-3 rounded-full border border-gray-200">
-                            <i data-lucide="chevron-left" class="w-4 h-4"></i> TORNA ALLA GALLERY
+                        <button onclick="updateState({view: 'category'})" class="mb-12 font-black uppercase text-[10px] flex items-center gap-2 bg-gray-50 px-8 py-4 rounded-full border-2 border-gray-100 hover:bg-black hover:text-white transition-all">
+                            <i data-lucide="arrow-left" class="w-4 h-4"></i> TORNA ALLA LISTA
                         </button>
-                        <div class="flex flex-col lg:flex-row gap-16">
-                            <div class="w-full lg:w-3/5 border-2 border-gray-100 aspect-square overflow-hidden rounded-[50px] bg-gray-50">
-                                <img src="${p.imgs[0]}" class="w-full h-full object-cover">
+                        <div class="flex flex-col lg:flex-row gap-20">
+                            <div class="w-full lg:w-3/5 relative group">
+                                <div class="aspect-square border-2 border-gray-100 overflow-hidden rounded-[60px] bg-gray-50 shadow-2xl">
+                                    <img src="${p.imgs[state.imgIndex]}" class="w-full h-full object-cover animate-fade-in">
+                                </div>
+                                ${p.imgs.length > 1 ? `
+                                    <button onclick="updateState({imgIndex: (state.imgIndex - 1 + ${p.imgs.length}) % ${p.imgs.length}})" class="absolute left-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-left" class="w-8 h-8"></i></button>
+                                    <button onclick="updateState({imgIndex: (state.imgIndex + 1) % ${p.imgs.length}})" class="absolute right-8 top-1/2 -translate-y-1/2 bg-white/90 p-5 rounded-full shadow-2xl opacity-0 group-hover:opacity-100 transition-opacity hover:scale-110"><i data-lucide="chevron-right" class="w-8 h-8"></i></button>
+                                    <div class="absolute bottom-10 left-1/2 -translate-x-1/2 flex gap-3">
+                                        ${p.imgs.map((_, i) => `<div class="h-1.5 rounded-full transition-all ${i === state.imgIndex ? 'bg-[#001f3f] w-10' : 'bg-gray-300 w-4'}"></div>`).join('')}
+                                    </div>
+                                ` : ''}
                             </div>
                             <div class="w-full lg:w-2/5 flex flex-col justify-center">
-                                <span class="text-gray-300 font-black text-sm uppercase mb-4">${p.sub}</span>
-                                <h2 class="text-6xl md:text-8xl font-black uppercase tracking-tighter leading-[0.8] mb-8">${p.name}</h2>
-                                <p class="text-6xl font-black italic text-[#001f3f] mb-12">€ ${p.price}</p>
-                                <div class="bg-gray-50 p-10 border-l-[10px] border-[#001f3f] rounded-[30px] mb-10">
-                                    <p class="text-xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
+                                <span class="text-[#001f3f]/30 font-black text-sm tracking-[0.4em] uppercase mb-6">${p.sub} // ID-${p.id.slice(-4)}</span>
+                                <h2 class="text-7xl md:text-9xl font-black uppercase tracking-tighter leading-[0.8] mb-10">${p.name}</h2>
+                                <p class="text-7xl font-black italic text-[#001f3f] mb-14 tracking-tighter">€ ${p.price}</p>
+                                <div class="bg-gray-50 p-12 border-l-[15px] border-[#001f3f] rounded-[40px] mb-12 shadow-inner">
+                                    <h4 class="text-[10px] font-black uppercase tracking-[0.3em] mb-4 opacity-20 text-[#001f3f]">Scheda Tecnica</h4>
+                                    <p class="text-2xl font-black italic text-gray-700 leading-tight">${p.desc}</p>
                                 </div>
-                                <button class="w-full bg-[#001f3f] text-white py-10 text-2xl font-black uppercase rounded-[30px] shadow-xl">ORDINA ORA</button>
+                                <button class="w-full bg-[#001f3f] text-white py-12 text-3xl font-black uppercase rounded-[40px] shadow-2xl active:scale-95 transition-all hover:bg-black tracking-tighter">CONTATTACI PER ACQUISTARE</button>
                             </div>
                         </div>
                     </div>
                 `;
             }
 
-            mainContent += '</main>';
-            root.innerHTML = header + mainContent;
+            content += '</main>';
+            root.innerHTML = header + content;
             lucide.createIcons();
         }
 
-        // --- AVVIO ---
-        window.onload = () => {
-            loadData(); // Carica dal LocalStorage all'avvio
-            render();
+        // --- INIT ---
+        window.onload = async () => {
+            await initAuth();
+            onAuthStateChanged(auth, (user) => {
+                if (user) setupRealtimeUpdates(user);
+            });
         };
     </script>
 </body>
