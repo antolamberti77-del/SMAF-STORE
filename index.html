@@ -1,14 +1,161 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>SMAF STORE</title>
+
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://unpkg.com/lucide@latest"></script>
+
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+
+body {
+    font-family: 'Inter', sans-serif;
+    background: #f8f9fa;
+    color: #001f3f;
+    overflow-x: hidden;
+}
+
+.animate-fade-in {
+    animation: fadeIn .4s ease-out forwards;
+}
+
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.toast {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #10b981;
+    color: white;
+    padding: 16px 40px;
+    border-radius: 999px;
+    font-weight: 900;
+    text-transform: uppercase;
+    z-index: 9999;
+    display: none;
+}
+</style>
+</head>
+
+<body class="pb-20">
+
+<div id="toast" class="toast"></div>
+<div id="root"></div>
+
+<script type="module">
+
+import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+
 import {
+    getAuth,
+    signInWithEmailAndPassword,
+    signOut,
+    onAuthStateChanged
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+
+import {
+    getFirestore,
+    collection,
+    addDoc,
+    deleteDoc,
+    doc,
+    onSnapshot
+} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+const firebaseConfig = {
+  apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
+  authDomain: "smaf-store.firebaseapp.com",
+  projectId: "smaf-store",
+  storageBucket: "smaf-store.firebasestorage.app",
+  messagingSenderId: "419225713088",
+  appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
+  measurementId: "G-4JBL54XKNN"
+};
+
+const app = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db = getFirestore(app);
+
+const appId = 'smaf-store-default';
+
+window.state = {
+    items: [],
+    view: 'home',
+    currentMacro: null,
+    currentSub: 'all',
+    selectedProduct: null,
+    searchTerm: '',
+
+    showAdmin: false,
+    isAdminAuthenticated: false,
+
+    adminEmail: '',
+    adminPassword: '',
+
+    newProduct: {
+        name: '',
+        price: '',
+        macro: '',
+        sub: '',
+        desc: '',
+        imgs: ['']
+    }
+};
+
+window.updateState = (obj) => {
+    window.state = {
+        ...window.state,
+        ...obj
+    };
+
+    render();
+};
+
+window.showToast = (msg) => {
+
+    const t = document.getElementById('toast');
+
+    t.innerText = msg;
+    t.style.display = 'block';
+
+    setTimeout(() => {
+        t.style.display = 'none';
+    }, 2500);
+};
+
+window.handleLogin = async (e) => {
+
+    e.preventDefault();
+
+    try {
+
+        await signInWithEmailAndPassword(
+            auth,
+            window.state.adminEmail,
+            window.state.adminPassword
+        );
+
+        window.updateState({
+            isAdminAuthenticated: true
+        });
 
         window.showToast('ACCESSO ADMIN');
 
     } catch (err) {
-
-        console.error(err);
-
-        window.updateState({
-            loginError: true
-        });
 
         window.showToast('LOGIN ERRATO');
     }
@@ -16,72 +163,309 @@ import {
 
 window.logoutAdmin = async () => {
 
-    try {
+    await signOut(auth);
 
-        await signOut(auth);
+    window.updateState({
+        isAdminAuthenticated: false,
+        showAdmin: false
+    });
 
-        window.updateState({
-            isAdminAuthenticated: false,
-            showAdmin: false,
-            adminEmail: '',
-            adminPassword: ''
-        });
-
-        window.showToast('LOGOUT');
-
-    } catch (err) {
-        console.error(err);
-    }
+    window.showToast('LOGOUT');
 };
 
-const adminLoginHTML = `
-<div class="max-w-md mx-auto text-center py-10">
+window.addNewProduct = async (e) => {
 
-    <h2 class="text-3xl font-black uppercase mb-6 italic">
-        Accesso Gestione
-    </h2>
+    e.preventDefault();
 
-    <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
+    const p = window.state.newProduct;
 
-        <input
-            type="email"
-            placeholder="EMAIL ADMIN"
-            class="p-5 border-2 rounded-[20px] font-bold text-center outline-none bg-gray-50"
-            oninput="window.state.adminEmail = this.value"
+    await addDoc(
+        collection(
+            db,
+            'artifacts',
+            appId,
+            'public',
+            'data',
+            'products'
+        ),
+        {
+            ...p,
+            createdAt: Date.now()
+        }
+    );
+
+    window.showToast('ARTICOLO AGGIUNTO');
+
+    window.state.newProduct = {
+        name: '',
+        price: '',
+        macro: '',
+        sub: '',
+        desc: '',
+        imgs: ['']
+    };
+
+    render();
+};
+
+window.deleteProduct = async (id) => {
+
+    await deleteDoc(
+        doc(
+            db,
+            'artifacts',
+            appId,
+            'public',
+            'data',
+            'products',
+            id
+        )
+    );
+
+    window.showToast('ELIMINATO');
+};
+
+onAuthStateChanged(auth, (user) => {
+
+    if (user) {
+
+        window.updateState({
+            isAdminAuthenticated: true
+        });
+    }
+});
+
+const q = collection(
+    db,
+    'artifacts',
+    appId,
+    'public',
+    'data',
+    'products'
+);
+
+onSnapshot(q, (snapshot) => {
+
+    const products = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+    }));
+
+    window.updateState({
+        items: products
+    });
+});
+
+function render() {
+
+    const s = window.state;
+
+    document.getElementById('root').innerHTML = `
+
+    <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center border-2 border-[#001f3f] rounded-[30px] bg-white sticky top-4 z-50 shadow-xl">
+
+        <h1
+            class="text-4xl md:text-6xl font-black italic uppercase tracking-tighter cursor-pointer"
+            onclick="updateState({view:'home'})"
         >
+            SMAF STORE
+        </h1>
 
-        <input
-            type="password"
-            placeholder="PASSWORD"
-            class="p-5 border-2 rounded-[20px] font-bold text-center outline-none bg-gray-50"
-            oninput="window.state.adminPassword = this.value"
-        >
+        <div class="flex gap-3 items-center">
 
-        <button
-            type="submit"
-            class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase"
-        >
-            Entra
-        </button>
+            <input
+                type="text"
+                placeholder="CERCA..."
+                class="hidden md:block border-2 border-[#001f3f] rounded-full px-5 py-2 font-black text-xs"
+                oninput="window.state.searchTerm=this.value; render()"
+            >
 
-    </form>
+            <button
+                onclick="updateState({showAdmin: !window.state.showAdmin})"
+                class="bg-[#001f3f] text-white px-6 py-3 rounded-full font-black uppercase text-xs"
+            >
+                ADMIN
+            </button>
 
-</div>
-`;
+        </div>
 
-const adminDashboardHTML = `
-<div class="flex justify-between items-center mb-10 border-b-2 border-gray-100 pb-6">
+    </header>
 
-    <h2 class="text-4xl font-black uppercase italic">
-        Nuovo Articolo
-    </h2>
+    <main class="max-w-[1600px] mx-auto px-6 md:px-10 mt-10">
 
-    <button
-        onclick="logoutAdmin()"
-        class="bg-red-500 text-white px-6 py-3 rounded-full font-black uppercase"
-    >
-        Logout
-    </button>
+        ${
+            s.showAdmin
+            ? adminPanel()
+            : s.view === 'home'
+            ? homePage()
+            : s.view === 'detail'
+            ? detailPage()
+            : categoryPage()
+        }
 
-</div>
-`;
+    </main>
+
+    `;
+
+    lucide.createIcons();
+}
+
+function adminPanel() {
+
+    const s = window.state;
+
+    if (!s.isAdminAuthenticated) {
+
+        return `
+
+        <div class="bg-white border-2 border-[#001f3f] rounded-[40px] p-10 max-w-md mx-auto animate-fade-in shadow-xl">
+
+            <h2 class="text-4xl font-black uppercase italic mb-6 text-center">
+                Accesso
+            </h2>
+
+            <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
+
+                <input
+                    type="email"
+                    placeholder="EMAIL"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50 font-bold"
+                    oninput="window.state.adminEmail=this.value"
+                >
+
+                <input
+                    type="password"
+                    placeholder="PASSWORD"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50 font-bold"
+                    oninput="window.state.adminPassword=this.value"
+                >
+
+                <button
+                    class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase"
+                >
+                    Entra
+                </button>
+
+            </form>
+
+        </div>
+        `;
+    }
+
+    return `
+
+    <div class="bg-white border-2 border-[#001f3f] rounded-[40px] p-10 animate-fade-in shadow-xl">
+
+        <div class="flex justify-between items-center mb-10">
+
+            <h2 class="text-5xl font-black italic uppercase">
+                Nuovo Articolo
+            </h2>
+
+            <button
+                onclick="logoutAdmin()"
+                class="bg-red-500 text-white px-6 py-3 rounded-full font-black uppercase"
+            >
+                Logout
+            </button>
+
+        </div>
+
+        <form onsubmit="addNewProduct(event)" class="grid md:grid-cols-2 gap-8">
+
+            <div class="flex flex-col gap-4">
+
+                <input
+                    placeholder="NOME"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50"
+                    oninput="window.state.newProduct.name=this.value"
+                >
+
+                <input
+                    placeholder="PREZZO"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50"
+                    oninput="window.state.newProduct.price=this.value"
+                >
+
+                <input
+                    placeholder="MACRO"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50"
+                    oninput="window.state.newProduct.macro=this.value"
+                >
+
+                <input
+                    placeholder="CATEGORIA"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50"
+                    oninput="window.state.newProduct.sub=this.value"
+                >
+
+            </div>
+
+            <div class="flex flex-col gap-4">
+
+                <textarea
+                    placeholder="DESCRIZIONE"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50 h-40"
+                    oninput="window.state.newProduct.desc=this.value"
+                ></textarea>
+
+                <input
+                    placeholder="URL IMMAGINE"
+                    class="p-5 rounded-[20px] border-2 bg-gray-50"
+                    oninput="window.state.newProduct.imgs=[this.value]"
+                >
+
+                <button
+                    class="bg-[#001f3f] text-white py-6 rounded-[25px] font-black uppercase"
+                >
+                    Salva Articolo
+                </button>
+
+            </div>
+
+        </form>
+
+    </div>
+    `;
+}
+
+function homePage() {
+
+    return `
+
+    <div class="animate-fade-in">
+
+        <div class="h-[600px] bg-[#001f3f] rounded-[50px] text-white p-16 flex items-end shadow-2xl">
+
+            <div>
+
+                <h2 class="text-7xl md:text-[10rem] font-black italic uppercase leading-[0.8] tracking-tighter">
+                    Elite
+                </h2>
+
+                <p class="uppercase text-xs font-black tracking-[0.5em] opacity-40 mt-4">
+                    Luxury Football & Streetwear
+                </p>
+
+            </div>
+
+        </div>
+
+    </div>
+    `;
+}
+
+function categoryPage() {
+    return '<div></div>';
+}
+
+function detailPage() {
+    return '<div></div>';
+}
+
+render();
+
+</script>
+
+</body>
+</html>
