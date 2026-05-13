@@ -85,28 +85,35 @@ const firebaseConfig = {
   appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
   measurementId: "G-4JBL54XKNN"
 };
-onSnapshot(
-  collection(
+const app = initializeApp(firebaseConfig);
+
+const auth = getAuth(app);
+
+const db = getFirestore(app);
+
+const appId = 'smaf-store-default';
+
+const q = collection(
     db,
     'artifacts',
-    'smaf-store-default',
+    appId,
     'public',
     'data',
     'products'
-  ),
-  (snapshot) => {
+);
+
+onSnapshot(q, (snapshot) => {
 
     const products = snapshot.docs.map(doc => ({
-      id: doc.id,
-      ...doc.data()
+        id: doc.id,
+        ...doc.data()
     }));
 
-    updateState({
-      items: products
+    window.updateState({
+        items: products
     });
 
-  }
-);
+});
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
