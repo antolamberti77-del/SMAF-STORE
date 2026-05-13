@@ -86,6 +86,7 @@ const firebaseConfig = {
   measurementId: "G-4JBL54XKNN"
 };
 
+
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
 const db = getFirestore(app);
@@ -445,6 +446,52 @@ function homePage() {
 
                 <p class="uppercase text-xs font-black tracking-[0.5em] opacity-40 mt-4">
                     Luxury Football & Streetwear
+                </p>
+
+            </div>
+
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
+
+            <div
+                onclick="updateState({
+                    currentMacro:'calcio',
+                    currentSub:'all',
+                    view:'category'
+                })"
+                class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f]
+                hover:bg-[#001f3f] hover:text-white transition-all
+                cursor-pointer shadow-lg"
+            >
+
+                <h3 class="text-6xl font-black italic uppercase">
+                    Jersey
+                </h3>
+
+                <p class="font-bold opacity-50 uppercase text-xs mt-2">
+                    Calcio & Performance
+                </p>
+
+            </div>
+
+            <div
+                onclick="updateState({
+                    currentMacro:'brand',
+                    currentSub:'all',
+                    view:'category'
+                })"
+                class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f]
+                hover:bg-[#001f3f] hover:text-white transition-all
+                cursor-pointer shadow-lg"
+            >
+
+                <h3 class="text-6xl font-black italic uppercase">
+                    Brands
+                </h3>
+
+                <p class="font-bold opacity-50 uppercase text-xs mt-2">
+                    Streetwear di Lusso
                 </p>
 
             </div>
