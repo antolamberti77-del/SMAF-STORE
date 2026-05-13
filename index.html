@@ -1,54 +1,21 @@
 <!DOCTYPE html>
 <html lang="it">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>SMAF STORE</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="referrer" content="no-referrer">
+    <title>SMAF STORE</title>
 
-<script src="https://cdn.tailwindcss.com"></script>
-<script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
 
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
-
-body{
-    font-family:'Inter',sans-serif;
-    background:#f8f9fa;
-    color:#001f3f;
-    overflow-x:hidden;
-}
-
-.animate-fade-in{
-    animation:fadeIn .4s ease-out forwards;
-}
-
-@keyframes fadeIn{
-    from{
-        opacity:0;
-        transform:translateY(10px);
-    }
-
-    to{
-        opacity:1;
-        transform:translateY(0);
-    }
-}
-
-.toast{
-    position:fixed;
-    bottom:30px;
-    left:50%;
-    transform:translateX(-50%);
-    background:#10b981;
-    color:white;
-    padding:16px 40px;
-    border-radius:999px;
-    font-weight:900;
-    text-transform:uppercase;
-    z-index:9999;
-    display:none;
-}
-</style>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
+        body { font-family: 'Inter', sans-serif; background: #f8f9fa; color: #001f3f; overflow-x: hidden; }
+        .animate-fade-in { animation: fadeIn .4s ease-out forwards; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+        .toast { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); background: #10b981; color: white; padding: 16px 40px; border-radius: 999px; font-weight: 900; text-transform: uppercase; z-index: 9999; display: none; }
+    </style>
 </head>
 
 <body class="pb-20">
@@ -57,480 +24,128 @@ body{
 <div id="root"></div>
 
 <script type="module">
+    import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+    import { getFirestore, collection, addDoc, deleteDoc, doc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+    const firebaseConfig = {
+        apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
+        authDomain: "smaf-store.firebaseapp.com",
+        projectId: "smaf-store",
+        storageBucket: "smaf-store.firebasestorage.app",
+        messagingSenderId: "419225713088",
+        appId: "1:419225713088:web:f523b3d0df7cab6fe73025"
+    };
 
-import {
-    getAuth,
-    signInWithEmailAndPassword,
-    signOut,
-    onAuthStateChanged
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-
-import {
-    getFirestore,
-    collection,
-    addDoc,
-    deleteDoc,
-    doc,
-    onSnapshot
-} from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
-const firebaseConfig = {
-  apiKey: "AIzaSyCBZM5c1zGzpQwDTYSmwHRGU8jDGNlPBNw",
-  authDomain: "smaf-store.firebaseapp.com",
-  projectId: "smaf-store",
-  storageBucket: "smaf-store.firebasestorage.app",
-  messagingSenderId: "419225713088",
-  appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
-  measurementId: "G-4JBL54XKNN"
-};
-
-const app = initializeApp(firebaseConfig);
-const auth = getAuth(app);
-const db = getFirestore(app);
-
-const appId = 'smaf-store-default';
-
-window.state = {
-    items: [],
-    view: 'home',
-    currentMacro: null,
-    currentSub: 'all',
-    selectedProduct: null,
-    searchTerm: '',
-
-    showAdmin: false,
-    isAdminAuthenticated: false,
-
-    adminEmail: '',
-    adminPassword: '',
-
-    newProduct: {
-        name: '',
-        price: '',
-        macro: '',
-        sub: '',
-        desc: '',
-        imgs: ['']
-    }
-};
-
-window.updateState = (obj) => {
+    const app = initializeApp(firebaseConfig);
+    const auth = getAuth(app);
+    const db = getFirestore(app);
+    const appId = 'smaf-store-default';
 
     window.state = {
-        ...window.state,
-        ...obj
+        items: [],
+        view: 'home',
+        currentMacro: null,
+        selectedProduct: null,
+        searchTerm: '',
+        showAdmin: false,
+        isAdminAuthenticated: false
     };
 
-    render();
-};
-
-window.showToast = (msg) => {
-
-    const t = document.getElementById('toast');
-
-    t.innerText = msg;
-    t.style.display = 'block';
-
-    setTimeout(() => {
-        t.style.display = 'none';
-    }, 2500);
-};
-
-window.handleLogin = async (e) => {
-
-    e.preventDefault();
-
-    try {
-
-        await signInWithEmailAndPassword(
-            auth,
-            window.state.adminEmail,
-            window.state.adminPassword
-        );
-
-        window.updateState({
-            isAdminAuthenticated: true
-        });
-
-        window.showToast('ACCESSO ADMIN');
-
-    } catch {
-
-        window.showToast('LOGIN ERRATO');
-    }
-};
-
-window.logoutAdmin = async () => {
-
-    await signOut(auth);
-
-    window.updateState({
-        isAdminAuthenticated: false,
-        showAdmin: false
-    });
-
-    window.showToast('LOGOUT');
-};
-
-window.addNewProduct = async (e) => {
-
-    e.preventDefault();
-
-    const p = window.state.newProduct;
-
-    await addDoc(
-        collection(
-            db,
-            'artifacts',
-            appId,
-            'public',
-            'data',
-            'products'
-        ),
-        {
-            ...p,
-            createdAt: Date.now()
-        }
-    );
-
-    window.showToast('ARTICOLO AGGIUNTO');
-
-    window.state.newProduct = {
-        name:'',
-        price:'',
-        macro:'',
-        sub:'',
-        desc:'',
-        imgs:['']
+    window.updateState = (obj) => {
+        window.state = { ...window.state, ...obj };
+        render();
     };
 
-    render();
-};
-
-window.deleteProduct = async (id) => {
-
-    await deleteDoc(
-        doc(
-            db,
-            'artifacts',
-            appId,
-            'public',
-            'data',
-            'products',
-            id
-        )
-    );
-
-    window.showToast('ELIMINATO');
-};
-
-onAuthStateChanged(auth, (user) => {
-
-    if(user){
-
-        window.updateState({
-            isAdminAuthenticated:true
-        });
-    }
-});
-
-const q = collection(
-    db,
-    'artifacts',
-    appId,
-    'public',
-    'data',
-    'products'
-);
-
-onSnapshot(q, (snapshot) => {
-
-    const products = snapshot.docs.map(doc => ({
-        id:doc.id,
-        ...doc.data()
-    }));
-
-    window.updateState({
-        items:products
-    });
-});
-
-function render(){
-
-    const s = window.state;
-
-    document.getElementById('root').innerHTML = `
-
-    <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center border-2 border-[#001f3f] rounded-[30px] bg-white sticky top-4 z-50 shadow-xl">
-
-        <h1
-            class="text-4xl md:text-6xl font-black italic uppercase tracking-tighter cursor-pointer"
-            onclick="updateState({view:'home'})"
-        >
-            SMAF STORE
-        </h1>
-
-        <div class="flex gap-3 items-center">
-
-            <input
-                type="text"
-                placeholder="CERCA..."
-                class="hidden md:block border-2 border-[#001f3f] rounded-full px-5 py-2 font-black text-xs"
-                oninput="window.state.searchTerm=this.value; render()"
-            >
-
-            <button
-                onclick="updateState({showAdmin: !window.state.showAdmin})"
-                class="bg-[#001f3f] text-white px-6 py-3 rounded-full font-black uppercase text-xs"
-            >
-                ADMIN
-            </button>
-
-        </div>
-
-    </header>
-
-    <main class="max-w-[1600px] mx-auto px-6 md:px-10 mt-10">
-
-        ${
-            s.showAdmin
-            ? adminPanel()
-            : s.view === 'home'
-            ? homePage()
-            : s.view === 'detail'
-            ? detailPage()
-            : categoryPage()
+    // NUOVA FUNZIONE: Gestisce la selezione senza errori di sintassi
+    window.selectProduct = (id) => {
+        const product = window.state.items.find(p => p.id === id);
+        if (product) {
+            window.updateState({ selectedProduct: product, view: 'detail' });
         }
+    };
 
-    </main>
-    `;
+    window.showToast = (msg) => {
+        const t = document.getElementById('toast');
+        t.innerText = msg; t.style.display = 'block';
+        setTimeout(() => { t.style.display = 'none'; }, 2500);
+    };
 
-    lucide.createIcons();
-}
+    // Listener dati Firebase
+    onSnapshot(collection(db, 'artifacts', appId, 'public', 'data', 'products'), (snap) => {
+        const products = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+        window.updateState({ items: products });
+    });
 
-function adminPanel(){
+    function render() {
+        const s = window.state;
+        const root = document.getElementById('root');
+        
+        root.innerHTML = `
+            <header class="mt-4 mx-4 md:mx-10 p-5 md:p-8 flex justify-between items-center border-2 border-[#001f3f] rounded-[30px] bg-white sticky top-4 z-50 shadow-xl">
+                <h1 class="text-4xl md:text-6xl font-black italic uppercase tracking-tighter cursor-pointer" onclick="updateState({view:'home'})">SMAF STORE</h1>
+                <div class="flex gap-3">
+                    <input type="text" placeholder="CERCA..." class="hidden md:block border-2 border-[#001f3f] rounded-full px-5 py-2 font-black text-xs" oninput="window.state.searchTerm=this.value; render()">
+                    <button onclick="updateState({showAdmin: !window.state.showAdmin})" class="bg-[#001f3f] text-white px-6 py-3 rounded-full font-black text-xs">ADMIN</button>
+                </div>
+            </header>
 
-    const s = window.state;
+            <main class="max-w-[1600px] mx-auto px-6 md:px-10 mt-10">
+                ${s.showAdmin ? '<div class="text-center text-4xl font-black">PANNELLO ADMIN</div>' : 
+                  s.view === 'home' ? homePage() : 
+                  s.view === 'detail' ? detailPage() : categoryPage()}
+            </main>
+        `;
+        lucide.createIcons();
+    }
 
-    if(!s.isAdminAuthenticated){
+    function homePage() {
+        return `
+            <div class="animate-fade-in">
+                <div class="h-[400px] bg-[#001f3f] rounded-[50px] text-white p-12 flex items-end mb-8 shadow-2xl">
+                    <h2 class="text-7xl md:text-9xl font-black italic uppercase leading-none">ELITE</h2>
+                </div>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    <div onclick="updateState({currentMacro:'calcio', view:'category'})" class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-lg text-5xl font-black italic uppercase">JERSEY</div>
+                    <div onclick="updateState({currentMacro:'brand', view:'category'})" class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f] hover:bg-[#001f3f] hover:text-white transition-all cursor-pointer shadow-lg text-5xl font-black italic uppercase">BRANDS</div>
+                </div>
+            </div>`;
+    }
+
+    function categoryPage() {
+        const s = window.state;
+        const filtered = s.items.filter(i => i.macro === s.currentMacro && i.name.toLowerCase().includes(s.searchTerm.toLowerCase()));
 
         return `
-
-        <div class="bg-white border-2 border-[#001f3f] rounded-[40px] p-10 max-w-md mx-auto animate-fade-in shadow-xl">
-
-            <h2 class="text-4xl font-black uppercase italic mb-6 text-center">
-                Accesso
-            </h2>
-
-            <form onsubmit="handleLogin(event)" class="flex flex-col gap-4">
-
-                <input
-                    type="email"
-                    placeholder="EMAIL"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50 font-bold"
-                    oninput="window.state.adminEmail=this.value"
-                >
-
-                <input
-                    type="password"
-                    placeholder="PASSWORD"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50 font-bold"
-                    oninput="window.state.adminPassword=this.value"
-                >
-
-                <button
-                    class="bg-[#001f3f] text-white p-5 rounded-[20px] font-black uppercase"
-                >
-                    Entra
-                </button>
-
-            </form>
-
-        </div>
-        `;
+            <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12 animate-fade-in">
+                ${filtered.map(item => `
+                    <div class="group cursor-pointer" onclick="window.selectProduct('${item.id}')">
+                        <div class="relative aspect-[4/5] rounded-[25px] overflow-hidden bg-white border-2 border-[#001f3f]/10 mb-4">
+                            <img src="${item.imgs?.[0] || ''}" class="w-full h-full object-cover">
+                        </div>
+                        <h3 class="text-[11px] font-black uppercase italic truncate">${item.name}</h3>
+                        <p class="text-lg font-black italic text-[#001f3f]">€ ${item.price}</p>
+                    </div>
+                `).join('')}
+            </div>`;
     }
 
-    return `
-    <div class="text-center text-5xl font-black italic uppercase animate-fade-in">
-        ADMIN ONLINE
-    </div>
-    `;
-}
-
-function homePage(){
-
-    return `
-
-    <div class="animate-fade-in">
-
-        <div class="h-[600px] bg-[#001f3f] rounded-[50px] text-white p-16 flex items-end shadow-2xl">
-
-            <div>
-
-                <h2 class="text-7xl md:text-[10rem] font-black italic uppercase leading-[0.8] tracking-tighter">
-                    Elite
-                </h2>
-
-                <p class="uppercase text-xs font-black tracking-[0.5em] opacity-40 mt-4">
-                    Luxury Football & Streetwear
-                </p>
-
-            </div>
-
-        </div>
-
-        <div class="grid grid-cols-1 md:grid-cols-2 gap-8 mt-8">
-
-            <div
-                onclick="updateState({
-                    currentMacro:'calcio',
-                    currentSub:'all',
-                    view:'category'
-                })"
-                class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f]
-                hover:bg-[#001f3f] hover:text-white transition-all
-                cursor-pointer shadow-lg"
-            >
-
-                <h3 class="text-6xl font-black italic uppercase">
-                    Jersey
-                </h3>
-
-            </div>
-
-            <div
-                onclick="updateState({
-                    currentMacro:'brand',
-                    currentSub:'all',
-                    view:'category'
-                })"
-                class="p-16 rounded-[40px] bg-white border-2 border-[#001f3f]
-                hover:bg-[#001f3f] hover:text-white transition-all
-                cursor-pointer shadow-lg"
-            >
-
-                <h3 class="text-6xl font-black italic uppercase">
-                    Brands
-                </h3>
-
-            </div>
-
-        </div>
-
-    </div>
-    `;
-}
-
-function categoryPage(){
-
-    const s = window.state;
-
-    const filtered = s.items.filter(i => {
-
-        return (
-            i.macro === s.currentMacro &&
-            i.name?.toLowerCase().includes(
-                s.searchTerm.toLowerCase()
-            )
-        );
-    });
-
-    return `
-
-    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12 animate-fade-in">
-
-        ${filtered.map(item => `
-
-            <div
-                class="group cursor-pointer"
-                onclick='updateState({selectedProduct:${JSON.stringify(item)},view:"detail"})'
-            >
-
-                <div class="relative aspect-[4/5] rounded-[25px] overflow-hidden bg-white border-2 border-[#001f3f]/5 mb-4">
-
-                    <img
-                        src="${item.imgs?.[0] || ''}"
-                        class="w-full h-full object-cover"
-                    >
-
+    function detailPage() {
+        const p = window.state.selectedProduct;
+        if (!p) return '';
+        return `
+            <div class="animate-fade-in py-10 flex flex-col lg:flex-row gap-16">
+                <div class="lg:w-3/5"><img src="${p.imgs?.[0] || ''}" class="w-full rounded-[50px] shadow-2xl"></div>
+                <div class="lg:w-2/5 flex flex-col justify-center">
+                    <h2 class="text-6xl font-black uppercase italic mb-8">${p.name}</h2>
+                    <p class="text-5xl font-black italic mb-10">€ ${p.price}</p>
+                    <div class="bg-white p-10 rounded-[30px] border-2 border-[#001f3f] mb-8 font-bold text-gray-600">${p.desc}</div>
+                    <button class="bg-[#10b981] text-white py-8 rounded-[25px] text-xl font-black uppercase">ACQUISTA ORA</button>
                 </div>
+            </div>`;
+    }
 
-                <h3 class="text-[11px] font-black uppercase italic truncate mb-1">
-                    ${item.name}
-                </h3>
-
-                <p class="text-lg font-black italic text-[#001f3f]">
-                    € ${item.price}
-                </p>
-
-            </div>
-
-        `).join('')}
-
-    </div>
-    `;
-}
-
-function detailPage(){
-
-    const p = window.state.selectedProduct;
-
-    if(!p) return '';
-
-    return `
-
-    <div class="animate-fade-in py-10">
-
-        <div class="flex flex-col lg:flex-row gap-16">
-
-            <div class="lg:w-3/5">
-
-                <div class="aspect-square rounded-[50px] overflow-hidden bg-white">
-
-                    <img
-                        src="${p.imgs?.[0] || ''}"
-                        class="w-full h-full object-cover"
-                    >
-
-                </div>
-
-            </div>
-
-            <div class="lg:w-2/5 flex flex-col justify-center">
-
-                <h2 class="text-6xl font-black uppercase italic mb-8">
-                    ${p.name}
-                </h2>
-
-                <p class="text-5xl font-black italic mb-10">
-                    € ${p.price}
-                </p>
-
-                <div class="bg-white p-10 rounded-[30px] border-2 border-[#001f3f] mb-8">
-
-                    <p class="font-bold text-gray-600">
-                        ${p.desc || ''}
-                    </p>
-
-                </div>
-
-                <button class="bg-[#001f3f] text-white py-8 rounded-[25px] text-xl font-black uppercase">
-                    ORDINA ORA
-                </button>
-
-            </div>
-
-        </div>
-
-    </div>
-    `;
-}
-
-render();
-
+    render();
 </script>
-
 </body>
 </html>
