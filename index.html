@@ -11,42 +11,42 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;700;900&display=swap');
 
-body {
-    font-family: 'Inter', sans-serif;
-    background: #f8f9fa;
-    color: #001f3f;
-    overflow-x: hidden;
+body{
+    font-family:'Inter',sans-serif;
+    background:#f8f9fa;
+    color:#001f3f;
+    overflow-x:hidden;
 }
 
-.animate-fade-in {
-    animation: fadeIn .4s ease-out forwards;
+.animate-fade-in{
+    animation:fadeIn .4s ease-out forwards;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
+@keyframes fadeIn{
+    from{
+        opacity:0;
+        transform:translateY(10px);
     }
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
+    to{
+        opacity:1;
+        transform:translateY(0);
     }
 }
 
-.toast {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    background: #10b981;
-    color: white;
-    padding: 16px 40px;
-    border-radius: 999px;
-    font-weight: 900;
-    text-transform: uppercase;
-    z-index: 9999;
-    display: none;
+.toast{
+    position:fixed;
+    bottom:30px;
+    left:50%;
+    transform:translateX(-50%);
+    background:#10b981;
+    color:white;
+    padding:16px 40px;
+    border-radius:999px;
+    font-weight:900;
+    text-transform:uppercase;
+    z-index:9999;
+    display:none;
 }
 </style>
 </head>
@@ -85,35 +85,6 @@ const firebaseConfig = {
   appId: "1:419225713088:web:f523b3d0df7cab6fe73025",
   measurementId: "G-4JBL54XKNN"
 };
-const app = initializeApp(firebaseConfig);
-
-const auth = getAuth(app);
-
-const db = getFirestore(app);
-
-const appId = 'smaf-store-default';
-
-const q = collection(
-    db,
-    'artifacts',
-    appId,
-    'public',
-    'data',
-    'products'
-);
-
-onSnapshot(q, (snapshot) => {
-
-    const products = snapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data()
-    }));
-
-    window.updateState({
-        items: products
-    });
-
-});
 
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);
@@ -146,6 +117,7 @@ window.state = {
 };
 
 window.updateState = (obj) => {
+
     window.state = {
         ...window.state,
         ...obj
@@ -184,7 +156,7 @@ window.handleLogin = async (e) => {
 
         window.showToast('ACCESSO ADMIN');
 
-    } catch (err) {
+    } catch {
 
         window.showToast('LOGIN ERRATO');
     }
@@ -226,12 +198,12 @@ window.addNewProduct = async (e) => {
     window.showToast('ARTICOLO AGGIUNTO');
 
     window.state.newProduct = {
-        name: '',
-        price: '',
-        macro: '',
-        sub: '',
-        desc: '',
-        imgs: ['']
+        name:'',
+        price:'',
+        macro:'',
+        sub:'',
+        desc:'',
+        imgs:['']
     };
 
     render();
@@ -256,10 +228,10 @@ window.deleteProduct = async (id) => {
 
 onAuthStateChanged(auth, (user) => {
 
-    if (user) {
+    if(user){
 
         window.updateState({
-            isAdminAuthenticated: true
+            isAdminAuthenticated:true
         });
     }
 });
@@ -276,16 +248,16 @@ const q = collection(
 onSnapshot(q, (snapshot) => {
 
     const products = snapshot.docs.map(doc => ({
-        id: doc.id,
+        id:doc.id,
         ...doc.data()
     }));
 
     window.updateState({
-        items: products
+        items:products
     });
 });
 
-function render() {
+function render(){
 
     const s = window.state;
 
@@ -333,17 +305,16 @@ function render() {
         }
 
     </main>
-
     `;
 
     lucide.createIcons();
 }
 
-function adminPanel() {
+function adminPanel(){
 
     const s = window.state;
 
-    if (!s.isAdminAuthenticated) {
+    if(!s.isAdminAuthenticated){
 
         return `
 
@@ -382,83 +353,13 @@ function adminPanel() {
     }
 
     return `
-
-    <div class="bg-white border-2 border-[#001f3f] rounded-[40px] p-10 animate-fade-in shadow-xl">
-
-        <div class="flex justify-between items-center mb-10">
-
-            <h2 class="text-5xl font-black italic uppercase">
-                Nuovo Articolo
-            </h2>
-
-            <button
-                onclick="logoutAdmin()"
-                class="bg-red-500 text-white px-6 py-3 rounded-full font-black uppercase"
-            >
-                Logout
-            </button>
-
-        </div>
-
-        <form onsubmit="addNewProduct(event)" class="grid md:grid-cols-2 gap-8">
-
-            <div class="flex flex-col gap-4">
-
-                <input
-                    placeholder="NOME"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50"
-                    oninput="window.state.newProduct.name=this.value"
-                >
-
-                <input
-                    placeholder="PREZZO"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50"
-                    oninput="window.state.newProduct.price=this.value"
-                >
-
-                <input
-                    placeholder="MACRO"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50"
-                    oninput="window.state.newProduct.macro=this.value"
-                >
-
-                <input
-                    placeholder="CATEGORIA"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50"
-                    oninput="window.state.newProduct.sub=this.value"
-                >
-
-            </div>
-
-            <div class="flex flex-col gap-4">
-
-                <textarea
-                    placeholder="DESCRIZIONE"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50 h-40"
-                    oninput="window.state.newProduct.desc=this.value"
-                ></textarea>
-
-                <input
-                    placeholder="URL IMMAGINE"
-                    class="p-5 rounded-[20px] border-2 bg-gray-50"
-                    oninput="window.state.newProduct.imgs=[this.value]"
-                >
-
-                <button
-                    class="bg-[#001f3f] text-white py-6 rounded-[25px] font-black uppercase"
-                >
-                    Salva Articolo
-                </button>
-
-            </div>
-
-        </form>
-
+    <div class="text-center text-5xl font-black italic uppercase animate-fade-in">
+        ADMIN ONLINE
     </div>
     `;
 }
 
-function homePage() {
+function homePage(){
 
     return `
 
@@ -497,10 +398,6 @@ function homePage() {
                     Jersey
                 </h3>
 
-                <p class="font-bold opacity-50 uppercase text-xs mt-2">
-                    Calcio & Performance
-                </p>
-
             </div>
 
             <div
@@ -518,10 +415,6 @@ function homePage() {
                     Brands
                 </h3>
 
-                <p class="font-bold opacity-50 uppercase text-xs mt-2">
-                    Streetwear di Lusso
-                </p>
-
             </div>
 
         </div>
@@ -530,7 +423,7 @@ function homePage() {
     `;
 }
 
-function categoryPage() {
+function categoryPage(){
 
     const s = window.state;
 
@@ -538,86 +431,53 @@ function categoryPage() {
 
         return (
             i.macro === s.currentMacro &&
-            (
-                s.currentSub === 'all' ||
-                i.sub === s.currentSub
-            ) &&
-            (
-                i.name
-                .toLowerCase()
-                .includes(
-                    s.searchTerm.toLowerCase()
-                )
+            i.name?.toLowerCase().includes(
+                s.searchTerm.toLowerCase()
             )
         );
     });
 
     return `
 
-    <div class="animate-fade-in">
+    <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12 animate-fade-in">
 
-        <div class="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-6">
+        ${filtered.map(item => `
 
-            <div>
+            <div
+                class="group cursor-pointer"
+                onclick='updateState({selectedProduct:${JSON.stringify(item)},view:"detail"})'
+            >
 
-                <button
-                    onclick="updateState({view:'home'})"
-                    class="text-[10px] font-black uppercase mb-4 flex items-center gap-2 px-4 py-2 rounded-full border border-gray-200 hover:bg-white transition-all"
-                >
-                    ← Home
-                </button>
+                <div class="relative aspect-[4/5] rounded-[25px] overflow-hidden bg-white border-2 border-[#001f3f]/5 mb-4">
 
-                <h2 class="text-7xl md:text-9xl font-black uppercase italic tracking-tighter leading-none">
-                    ${s.currentMacro}
-                </h2>
-
-            </div>
-
-        </div>
-
-        <div class="grid grid-cols-2 lg:grid-cols-4 xl:grid-cols-5 gap-x-6 gap-y-12">
-
-            ${filtered.map(item => `
-
-                <div
-                    class="group cursor-pointer"
-                    onclick='updateState({selectedProduct:${JSON.stringify(item)},view:"detail"})'
-                >
-
-                    <div class="relative aspect-[4/5] rounded-[25px] overflow-hidden bg-white border-2 border-[#001f3f]/5 group-hover:border-[#001f3f] transition-all mb-4">
-
-                        <img
-                            src="${item.imgs?.[0] || ''}"
-                            class="w-full h-full object-cover group-hover:scale-105 transition-all duration-500"
-                        >
-
-                    </div>
-
-                    <h3 class="text-[11px] font-black uppercase italic truncate mb-1">
-                        ${item.name}
-                    </h3>
-
-                    <p class="text-lg font-black italic text-[#001f3f]">
-                        € ${item.price}
-                    </p>
+                    <img
+                        src="${item.imgs?.[0] || ''}"
+                        class="w-full h-full object-cover"
+                    >
 
                 </div>
 
-            `).join('')}
+                <h3 class="text-[11px] font-black uppercase italic truncate mb-1">
+                    ${item.name}
+                </h3>
 
-        </div>
+                <p class="text-lg font-black italic text-[#001f3f]">
+                    € ${item.price}
+                </p>
+
+            </div>
+
+        `).join('')}
 
     </div>
     `;
 }
 
-function detailPage() {
+function detailPage(){
 
     const p = window.state.selectedProduct;
 
-    if (!p) {
-        return '';
-    }
+    if(!p) return '';
 
     return `
 
@@ -627,10 +487,9 @@ function detailPage() {
 
             <div class="lg:w-3/5">
 
-                <div class="aspect-square rounded-[50px] overflow-hidden border-2 border-[#001f3f]/5 bg-white relative">
+                <div class="aspect-square rounded-[50px] overflow-hidden bg-white">
 
                     <img
-                        id="main-img"
                         src="${p.imgs?.[0] || ''}"
                         class="w-full h-full object-cover"
                     >
@@ -641,35 +500,24 @@ function detailPage() {
 
             <div class="lg:w-2/5 flex flex-col justify-center">
 
-                <span class="text-[#001f3f]/30 font-black text-xs uppercase mb-6 tracking-widest">
-                    ${p.macro} | ${p.sub}
-                </span>
-
-                <h2 class="text-6xl md:text-7xl font-black uppercase italic leading-[0.8] mb-8 tracking-tighter">
+                <h2 class="text-6xl font-black uppercase italic mb-8">
                     ${p.name}
                 </h2>
 
-                <p class="text-6xl font-black italic text-[#001f3f] mb-12 tracking-tighter">
+                <p class="text-5xl font-black italic mb-10">
                     € ${p.price}
                 </p>
 
-                <div class="bg-white p-10 border-2 border-[#001f3f] rounded-[30px] mb-8">
+                <div class="bg-white p-10 rounded-[30px] border-2 border-[#001f3f] mb-8">
 
-                    <p class="text-lg font-bold italic text-gray-600 leading-relaxed">
-                        ${p.desc || 'Qualità Elite garantita'}
+                    <p class="font-bold text-gray-600">
+                        ${p.desc || ''}
                     </p>
 
                 </div>
 
-                <button class="bg-[#001f3f] text-white py-8 rounded-[25px] text-xl font-black uppercase hover:bg-black transition-all">
+                <button class="bg-[#001f3f] text-white py-8 rounded-[25px] text-xl font-black uppercase">
                     ORDINA ORA
-                </button>
-
-                <button
-                    onclick="updateState({view:'category'})"
-                    class="mt-4 text-[#001f3f] py-4 font-black uppercase text-xs opacity-50 hover:opacity-100 transition-all"
-                >
-                    Chiudi
                 </button>
 
             </div>
